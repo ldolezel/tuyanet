@@ -45,9 +45,9 @@ namespace com.clusterrr.TuyaNet.Services
             return statusResp.Json?.Contains("true") == true;
         }
 
-        public async Task TurnOn()
+        public async Task TurnOn(int switchNo=1)
         {
-            var response = await SetStatus(device, true);
+            var response = await SetStatus(device, true, switchNo);
             Console.WriteLine($"Set status info. Response JSON: {response.Json}");
         }
 
@@ -56,10 +56,15 @@ namespace com.clusterrr.TuyaNet.Services
             await device.SecureConnectAsync();
             Console.WriteLine($"Success connected.");
         }
+		public void Disconnect()
+		{
+			device.Close();
+			Console.WriteLine($"Success disconnected.");
+		}
 
-        public async Task TurnOff()
+		public async Task TurnOff(int switchNo = 1)
         {
-            var response = await SetStatus(device, false);
+            var response = await SetStatus(device, false, switchNo);
             Console.WriteLine($"Set status info. Response JSON: {response.Json}");
         }
 
@@ -74,11 +79,13 @@ namespace com.clusterrr.TuyaNet.Services
             return response;
         }
 
-        private async Task<TuyaLocalResponse> SetStatus(TuyaDevice dev, bool switchStatus)
+        private async Task<TuyaLocalResponse> SetStatus(TuyaDevice dev, bool switchStatus, int switchNo)
         {
             var requestQuery = string.Empty;
             var command = TuyaCommand.CONTROL;
-            if (dev.ProtocolVersion == TuyaProtocolVersion.V34)
+			var switchstr = switchNo.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+						if (dev.ProtocolVersion == TuyaProtocolVersion.V34)
             {
                 command = TuyaCommand.CONTROL_NEW;
                 var rawJson = new
@@ -91,7 +98,7 @@ namespace com.clusterrr.TuyaNet.Services
                         uid = string.Empty,
                         dps = new Dictionary<string, object>()
                         {
-                            { "1", switchStatus }
+                            {switchstr, switchStatus }
                         }
                     },
                     protocol = 5,
@@ -101,7 +108,7 @@ namespace com.clusterrr.TuyaNet.Services
             }
             else
             {
-                requestQuery = dev.FillJson("{\"dps\":{\"1\":" + switchStatus.ToString().ToLower() + "}}");
+                requestQuery = dev.FillJson("{\"dps\":{\""+ switchstr+"\":" + switchStatus.ToString().ToLower() + "}}");
             }
 
             var request = dev.EncodeRequest(command, requestQuery);
