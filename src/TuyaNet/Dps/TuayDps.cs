@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 
 namespace com.clusterrr.TuyaNet.Dps
 {
-	internal class TuayDps
+	public class TuayDps
 	{
 		[JsonInclude()]
 		public Dictionary<string, object> dps { get; set; }

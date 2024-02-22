@@ -45,8 +45,7 @@ namespace com.clusterrr.TuyaNet.Services
 
 		public async Task<bool> GetStatus(string switchNo = "1")
 		{
-			var statusResp = await GetStatus(device);
-			_log?.Debug(8, device?.DeviceId, $"GetStatus of {switchNo}. Response JSON: {statusResp?.Json}");
+			var statusResp = await GetFullStatus(switchNo);
 			var dps = JsonConvert.DeserializeObject<TuayDps>(statusResp.Json);
 			if (!dps.dps.TryGetValue(switchNo, out var status))
 			{
@@ -55,6 +54,12 @@ namespace com.clusterrr.TuyaNet.Services
 			return Convert.ToBoolean(status);
 		}
 
+		public async Task<TuyaLocalResponse> GetFullStatus(string switchNo = "1")
+		{
+			var statusResp = await GetStatus(device);
+			_log?.Debug(8, device?.DeviceId, $"GetFullStatus of {switchNo}. Response JSON: {statusResp?.Json}");
+			return statusResp;
+		}
 		public async Task TurnOn(string switchNo = "1")
 		{
 			var response = await SetStatus(device, true, switchNo);
@@ -89,7 +94,13 @@ namespace com.clusterrr.TuyaNet.Services
 			return response;
 		}
 
-		private async Task<TuyaLocalResponse> SetStatus(TuyaDevice dev, bool switchStatus, string switchNo)
+		public async Task<TuyaLocalResponse> SetStatus(string switchNo, bool switchStatus)
+		{
+			var response = await SetStatus(device, switchStatus, switchNo);
+			_log?.Debug(8, device?.DeviceId, $"SetStatus {switchNo} to {switchStatus}. Response JSON: {response?.Json}");
+			return response;
+		}
+		async Task<TuyaLocalResponse> SetStatus(TuyaDevice dev, bool switchStatus, string switchNo)
 		{
 			var requestQuery = string.Empty;
 			var command = TuyaCommand.CONTROL;
