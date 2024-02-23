@@ -47,11 +47,12 @@ namespace com.clusterrr.TuyaNet.Services
 		{
 			var statusResp = await GetFullStatus(switchNo);
 			var dps = JsonConvert.DeserializeObject<TuayDps>(statusResp.Json);
-			if (!dps.dps.TryGetValue(switchNo, out var status))
+			var res = dps.TryGetBool(switchNo);
+			if (res==null)
 			{
 				throw new Exception($"switch {switchNo} not found");
 			}
-			return Convert.ToBoolean(status);
+			return res.Value;
 		}
 
 		public async Task<TuyaLocalResponse> GetFullStatus(string switchNo = "1")
@@ -73,8 +74,15 @@ namespace com.clusterrr.TuyaNet.Services
 		}
 		public void Disconnect()
 		{
-			device.Close();
-			_log?.Debug(5, device?.DeviceId, $"Success disconnected.");
+			try
+			{
+				device.Close();
+				_log?.Debug(5, device?.DeviceId, $"Success disconnected.");
+			}
+			catch (Exception ex)
+			{
+				_log?.Debug(5, device?.DeviceId, $"Error disconnected: {ex.Message}");
+			}
 		}
 
 		public async Task TurnOff(string switchNo = "1")
