@@ -389,8 +389,10 @@ namespace com.clusterrr.TuyaNet
                 return new TuyaLocalResponse(command, returnCode, null, null);
 
             var json = Encoding.UTF8.GetString(data);
-            if (!json.StartsWith("{") || !json.EndsWith("}"))
-                throw new InvalidDataException($"Response is not JSON: {json}");
+			if (!json.StartsWith("{") || !json.EndsWith("}"))
+			{
+				throw new InvalidDataException($"Response is not JSON: {json}");
+			}
             
             return new TuyaLocalResponse(command, returnCode, data, json);
         }

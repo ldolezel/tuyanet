@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -36,8 +37,9 @@ namespace com.clusterrr.TuyaNet.Services
 					ip: tuyaDeviceInfo.LocalIp,
 					localKey: tuyaDeviceInfo.LocalKey,
 					deviceId: tuyaDeviceInfo.DeviceId,
-					protocolVersion: deviceVersion.Value);
-
+					protocolVersion: deviceVersion.Value, 
+					log:_log);
+					
 			dev.PermanentConnection = true;
 
 			return dev;
@@ -72,6 +74,12 @@ namespace com.clusterrr.TuyaNet.Services
 			await device.SecureConnectAsync();
 			_log?.Debug(5, device?.DeviceId, $"Success connected.");
 		}
+		public bool IsConnected()
+		{
+			return device!=null && device.IsConnected();
+		}
+
+
 		public void Disconnect()
 		{
 			try
@@ -93,12 +101,17 @@ namespace com.clusterrr.TuyaNet.Services
 
 		private async Task<TuyaLocalResponse> GetStatus(TuyaDevice dev)
 		{
-			var requestQuery =
-					"{\"gwId\":\"DEVICE_ID\",\"devId\":\"DEVICE_ID\",\"uid\":\"DEVICE_ID\",\"t\":\"CURRENT_TIME\"}";
+			/*var requestQuery =
+					"{\"gwId\":\"DEVICE_ID\",\"devId\":\"DEVICE_ID\",\"uid\":\"DEVICE_ID\",\"t\":\"CURRENT_TIME\"}";*/
+
+			var requestQuery = dev.FillJson("", true, true, true, true);
+
 			var command = TuyaCommand.DP_QUERY;
+			_log?.Debug(8, "TUYA", $"Sending JSON {requestQuery}");
 			var request = dev.EncodeRequest(command, requestQuery);
 			var encryptedResponse = await dev.SendAsync(command, request);
 			var response = dev.DecodeResponse(encryptedResponse);
+			_log?.Debug(8, "TUYA", $"Received JSON {response?.Json}");
 			return response;
 		}
 
@@ -139,9 +152,11 @@ namespace com.clusterrr.TuyaNet.Services
 				requestQuery = dev.FillJson("{\"dps\":{\"" + switchNo + "\":" + switchStatus.ToString().ToLower() + "}}");
 			}
 
+			_log?.Debug(8, "TUYA", $"Sending JSON {requestQuery}");
 			var request = dev.EncodeRequest(command, requestQuery);
 			var encryptedResponse = await dev.SendAsync(command, request);
 			var response = dev.DecodeResponse(encryptedResponse);
+			_log?.Debug(8, "TUYA", $"Received JSON {response?.Json}");
 			return response;
 		}
 	}

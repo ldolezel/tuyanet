@@ -43,7 +43,7 @@ namespace com.clusterrr.TuyaNet
         /// <param name="port">TCP port of device.</param>
         /// <param name="receiveTimeout">Receive timeout (msec).</param>
         public TuyaIRControl(string ip, string localKey, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
-            : base(ip, localKey, deviceId, protocolVersion, port, receiveTimeout)
+            : base(ip, localKey, deviceId,null, protocolVersion, port, receiveTimeout)
         {
         }
 
@@ -59,7 +59,7 @@ namespace com.clusterrr.TuyaNet
         /// <param name="port">TCP port of device.</param>
         /// <param name="receiveTimeout">Receive timeout (msec).</param> 
         public TuyaIRControl(string ip, TuyaApi.Region region, string accessId, string apiSecret, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
-            : base(ip, region, accessId, apiSecret, deviceId, protocolVersion, port, receiveTimeout)
+            : base(ip, region, accessId, apiSecret, deviceId,null, protocolVersion, port, receiveTimeout)
         {
         }
 

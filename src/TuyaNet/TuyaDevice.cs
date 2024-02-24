@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using com.clusterrr.TuyaNet.Extensions;
+using com.clusterrr.TuyaNet.Log;
 
 namespace com.clusterrr.TuyaNet
 {
@@ -19,7 +20,7 @@ namespace com.clusterrr.TuyaNet
 	public class TuyaDevice : IDisposable
 	{
 		private readonly TuyaParser parser;
-
+		ILog _log;
 		/// <summary>
 		/// Creates a new instance of the TuyaDevice class.
 		/// </summary>
@@ -30,11 +31,12 @@ namespace com.clusterrr.TuyaNet
 		/// <param name="port">TCP port of device.</param>
 		/// <param name="receiveTimeout">Receive timeout (msec).</param>
 		public TuyaDevice(
-				string ip, string localKey, string deviceId,
+				string ip, string localKey, string deviceId, ILog log = null ,
 				TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33,
 				int port = 6668,
 				int receiveTimeout = 1500)
 		{
+			_log= log;
 			IP = ip;
 			LocalKey = localKey;
 			this.accessId = null;
@@ -57,8 +59,10 @@ namespace com.clusterrr.TuyaNet
 		/// <param name="protocolVersion">Protocol version.</param>
 		/// <param name="port">TCP port of device.</param>
 		/// <param name="receiveTimeout">Receive timeout (msec).</param> 
-		public TuyaDevice(string ip, TuyaApi.Region region, string accessId, string apiSecret, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
+		public TuyaDevice(string ip, TuyaApi.Region region, string accessId, string apiSecret, string deviceId,
+			 ILog log = null ,TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
 		{
+			_log = log;
 			IP = ip;
 			LocalKey = null;
 			this.region = region;
@@ -181,12 +185,22 @@ namespace com.clusterrr.TuyaNet
 		public async Task<TuyaLocalResponse> SendAsync(TuyaCommand command, string json, int retries = 2, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
 				=> DecodeResponse(await SendAsync(command, EncodeRequest(command, json), retries, nullRetries, overrideRecvTimeout, cancellationToken));
 
+
+		public bool IsConnected()
+		{
+			return client != null && client.Connected;
+		}
+
 		public async Task SecureConnectAsync(CancellationToken cancellationToken = default)
 		{
 			if (client == null)
 				client = new TcpClient();
 			if (!client.ConnectAsync(IP, Port).Wait(ConnectionTimeout))
-				throw new IOException("Connection timeout");
+			{
+				_log?.Error("TUYADEV", $"Connection to {IP}:{Port} timeout");
+				throw new IOException($"Connection to {IP}:{Port} timeout");
+			}
+			_log?.Debug(6, "TUYADEV", $"Connection to {IP}:{Port} opened");
 			networkClientStream = client.GetStream();
 
 			if (ProtocolVersion == TuyaProtocolVersion.V34)
@@ -236,6 +250,7 @@ namespace com.clusterrr.TuyaNet
 			client?.Close();
 			client?.Dispose();
 			client = null;
+			_log?.Debug(6,"TUYADEV", $"Device closed");
 		}
 		/// <summary>
 		/// Sends raw data over to device and read response.
@@ -265,16 +280,25 @@ namespace com.clusterrr.TuyaNet
 						{
 							throw new Exception("Need invoke ConnectAsync before sendig.");
 						}
+
+						_log?.Debug(9, "TUYADEV", $"Sending: lenght={data.Length}, data={BitConverter.ToString(data)}");
+
 						await networkClientStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
 						var str = client.GetStream();
 						byte[] response = null;
 						while (response == null)
 						{
 							var responseRaw = await ReceiveAsync(str, nullRetries, overrideRecvTimeout, cancellationToken);
+
+
 							var responseParsed = parser.DecodeResponse(responseRaw);
-							Console.WriteLine($"Command: {responseParsed.Command.GetNames()}");
-							Console.WriteLine($"Json: {responseParsed.Json}");
-							Console.WriteLine($"Size payload: {responseParsed.Payload?.Length}");
+							//Console.WriteLine($"Command: {responseParsed.Command.GetNames()}");
+							//Console.WriteLine($"Json: {responseParsed.Json}");
+							//Console.WriteLine($"Size payload: {responseParsed.Payload?.Length}");
+
+							_log?.Debug(8, "TUYADEV", $"Received command: {responseParsed.Command.GetNames()}");
+							_log?.Debug(8, "TUYADEV", $"Received json: {responseParsed.Json}");
+
 							//for protocol v3.4 need wait response by command
 							if (responseParsed.Command == command ||
 									ProtocolVersion != TuyaProtocolVersion.V34)
@@ -291,6 +315,7 @@ namespace com.clusterrr.TuyaNet
 				}
 				catch (Exception ex)
 				{
+					_log?.Error("TUYADEV", ex.Message);
 					throw ex;
 				}
 				finally
@@ -327,7 +352,9 @@ namespace com.clusterrr.TuyaNet
 					if (t == timeoutTask)
 					{
 						if (stream.DataAvailable)
+						{
 							bytes = await stream.ReadAsync(buffer, 0, length, cancellationToken);
+						}
 						else
 							throw new TimeoutException();
 					}
@@ -335,6 +362,7 @@ namespace com.clusterrr.TuyaNet
 					{
 						bytes = await readTask;
 					}
+					_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer)}");
 					ms.Write(buffer, 0, bytes);
 					var receivedArray = ms.ToArray();
 					if (receivedArray.Length > 4)
@@ -353,6 +381,7 @@ namespace com.clusterrr.TuyaNet
 			{
 				await Task.Delay(NullRetriesInterval, cancellationToken);
 				result = await ReceiveAsync(stream, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
+				_log?.Debug(9, "TUYADEV", $"Received: lenght={result.Length}, data={BitConverter.ToString(result)}");
 			}
 			return result;
 		}
