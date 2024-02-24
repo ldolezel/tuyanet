@@ -1,9 +1,35 @@
-﻿namespace com.clusterrr.TuyaNet
+﻿using Newtonsoft.Json;
+using System.Collections.Generic;
+
+namespace com.clusterrr.TuyaNet
 {
-    /// <summary>
-    /// Tuya command type
-    /// </summary>
-    public enum TuyaCommand
+	public class TuyaCommandApi
+	{
+		[JsonProperty("commands")]
+		public List<TuyaDeviceStatus> Commands { get; set; }=new List<TuyaDeviceStatus>();
+	}
+
+	public class TuyaCommandApiResult
+	{
+		[JsonProperty("result")]
+		public bool Result { get; set; }
+		[JsonProperty("success")]
+		public bool Success { get; set; }
+
+		[JsonProperty("msg")]
+		public string Msg { get; set; }
+
+		[JsonProperty("code")]
+		public int Code { get; set; }
+
+	}
+
+
+
+	/// <summary>
+	/// Tuya command type
+	/// </summary>
+	public enum TuyaCommand
     {
         UDP = 0,
         AP_CONFIG = 1,

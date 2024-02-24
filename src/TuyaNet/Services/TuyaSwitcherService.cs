@@ -20,10 +20,10 @@ namespace com.clusterrr.TuyaNet.Services
 		public TuyaSwitcherService(TuyaDeviceInfo deviceInfo, ILog log = null)
 		{
 			_log=log;
-			this.device = GetDevice(deviceInfo);
+			this.device = GetDevice(deviceInfo,log);
 		}
 
-		private TuyaDevice GetDevice(TuyaDeviceInfo tuyaDeviceInfo)
+		public static TuyaDevice GetDevice(TuyaDeviceInfo tuyaDeviceInfo, ILog log = null)
 		{
 			var allVersions = EnumExtensions.GetTuyaVersionsValues()
 					.Select(x => new { ver = x.ToString().Replace("V", ""), value = x });
@@ -38,7 +38,7 @@ namespace com.clusterrr.TuyaNet.Services
 					localKey: tuyaDeviceInfo.LocalKey,
 					deviceId: tuyaDeviceInfo.DeviceId,
 					protocolVersion: deviceVersion.Value, 
-					log:_log);
+					log: log);
 					
 			dev.PermanentConnection = true;
 

@@ -54,7 +54,7 @@
             Request method.
             </summary>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaApi.RequestAsync(com.clusterrr.TuyaNet.TuyaApi.Method,System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Boolean,System.Boolean,System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaApi.RequestAsync(com.clusterrr.TuyaNet.TuyaApi.Method,System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Boolean,System.Boolean,System.Threading.CancellationToken,com.clusterrr.TuyaNet.Log.ILog)">
             <summary>
             Request to official API.
             </summary>
@@ -64,14 +64,27 @@
             <param name="noToken">Execute query without token.</param>
             <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
             <param name="cancellationToken">Cancellation token.</param>
+            <returns>string with response.</returns>
             <returns>JSON string with response.</returns>
+        </member>
+        <member name="M:com.clusterrr.TuyaNet.TuyaApi.RequestAsyncRaw(com.clusterrr.TuyaNet.TuyaApi.Method,System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Boolean,System.Boolean,System.Threading.CancellationToken,com.clusterrr.TuyaNet.Log.ILog)">
+            <summary>
+            Request to official API.
+            </summary>
+            <param name="uri">Method URI.</param>
+            <param name="body">Body of request if any.</param>
+            <param name="headers">Additional headers.</param>
+            <param name="noToken">Execute query without token.</param>
+            <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>string with response.</returns>
         </member>
         <member name="M:com.clusterrr.TuyaNet.TuyaApi.RefreshAccessTokenAsync(System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Request access token if it's expired or not requested yet.
             </summary>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaApi.GetDeviceInfoAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaApi.GetDeviceInfoAsync(System.String,System.Boolean,System.Threading.CancellationToken,com.clusterrr.TuyaNet.Log.ILog)">
             <summary>
             Requests info about device by it's ID.
             </summary>
@@ -80,7 +93,7 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Device info.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaApi.GetAllDevicesInfoAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaApi.GetAllDevicesInfoAsync(System.String,System.Boolean,System.Threading.CancellationToken,com.clusterrr.TuyaNet.Log.ILog)">
             <summary>
             Requests info about all registered devices, requires ID of any registered device.
             </summary>

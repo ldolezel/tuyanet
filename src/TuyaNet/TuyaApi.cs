@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using com.clusterrr.TuyaNet.Log;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -12,115 +13,141 @@ using System.Threading.Tasks;
 
 namespace com.clusterrr.TuyaNet
 {
-    /// <summary>
-    /// Provides access to Tuya Cloud API.
-    /// </summary>
-    public class TuyaApi
-    {
-        private readonly Region region;
-        private readonly string accessId;
-        private readonly string apiSecret;
-        private readonly HttpClient httpClient;
-        private TuyaToken token = null;
-        private DateTime tokenTime = new DateTime();
-        public string TokenUid { get => token?.Uid;}
+	/// <summary>
+	/// Provides access to Tuya Cloud API.
+	/// </summary>
+	public class TuyaApi
+	{
+		private readonly Region region;
+		private readonly string accessId;
+		private readonly string apiSecret;
+		private readonly HttpClient httpClient;
+		private TuyaToken token = null;
+		private DateTime tokenTime = new DateTime();
+		public string TokenUid { get => token?.Uid; }
 
-        private class TuyaToken
-        {
-            [JsonProperty("access_token")]
-            public string AccessToken { get; set; }
+		private class TuyaToken
+		{
+			[JsonProperty("access_token")]
+			public string AccessToken { get; set; }
 
-            [JsonProperty("expire_time")]
-            public int ExpireTime { get; set; }
+			[JsonProperty("expire_time")]
+			public int ExpireTime { get; set; }
 
-            [JsonProperty("refresh_token")]
-            public string RefreshToken { get; set; }
+			[JsonProperty("refresh_token")]
+			public string RefreshToken { get; set; }
 
-            [JsonProperty("uid")]
-            public string Uid { get; set; }
-        }
+			[JsonProperty("uid")]
+			public string Uid { get; set; }
+		}
 
-        /// <summary>
-        /// Creates a new instance of the TuyaApi class.
-        /// </summary>
-        /// <param name="region">Region of server.</param>
-        /// <param name="accessId">Access ID/Client ID from https://iot.tuya.com/ .</param>
-        /// <param name="apiSecret">API secret from https://iot.tuya.com/ .</param>
-        public TuyaApi(Region region, string accessId, string apiSecret)
-        {
-            this.region = region;
-            this.accessId = accessId;
-            this.apiSecret = apiSecret;
-            httpClient = new HttpClient();
-        }
+		/// <summary>
+		/// Creates a new instance of the TuyaApi class.
+		/// </summary>
+		/// <param name="region">Region of server.</param>
+		/// <param name="accessId">Access ID/Client ID from https://iot.tuya.com/ .</param>
+		/// <param name="apiSecret">API secret from https://iot.tuya.com/ .</param>
+		public TuyaApi(Region region, string accessId, string apiSecret)
+		{
+			this.region = region;
+			this.accessId = accessId;
+			this.apiSecret = apiSecret;
+			httpClient = new HttpClient();
+		}
 
-        /// <summary>
-        /// Region of server.
-        /// </summary>
-        public enum Region
-        {
-            China,
-            WesternAmerica,
-            EasternAmerica,
-            CentralEurope,
-            WesternEurope,
-            India
-        }
+		/// <summary>
+		/// Region of server.
+		/// </summary>
+		public enum Region
+		{
+			China,
+			WesternAmerica,
+			EasternAmerica,
+			CentralEurope,
+			WesternEurope,
+			India
+		}
 
-        /// <summary>
-        /// Request method.
-        /// </summary>
-        public enum Method
-        {
-            GET,
-            POST,
-            PUT,
-            DELETE
-        }
+		/// <summary>
+		/// Request method.
+		/// </summary>
+		public enum Method
+		{
+			GET,
+			POST,
+			PUT,
+			DELETE
+		}
 
-        private static string RegionToHost(Region region)
-        {
-            string urlHost = null;
-            switch (region)
-            {
-                case Region.China:
-                    urlHost = "openapi.tuyacn.com";
-                    break;
-                case Region.WesternAmerica:
-                    urlHost = "openapi.tuyaus.com";
-                    break;
-                case Region.EasternAmerica:
-                    urlHost = "openapi-ueaz.tuyaus.com";
-                    break;
-                case Region.CentralEurope:
-                    urlHost = "openapi.tuyaeu.com";
-                    break;
-                case Region.WesternEurope:
-                    urlHost = "openapi-weaz.tuyaeu.com";
-                    break;
-                case Region.India:
-                    urlHost = "openapi.tuyain.com";
-                    break;
-            }
-            return urlHost;
-        }
+		private static string RegionToHost(Region region)
+		{
+			string urlHost = null;
+			switch (region)
+			{
+				case Region.China:
+					urlHost = "openapi.tuyacn.com";
+					break;
+				case Region.WesternAmerica:
+					urlHost = "openapi.tuyaus.com";
+					break;
+				case Region.EasternAmerica:
+					urlHost = "openapi-ueaz.tuyaus.com";
+					break;
+				case Region.CentralEurope:
+					urlHost = "openapi.tuyaeu.com";
+					break;
+				case Region.WesternEurope:
+					urlHost = "openapi-weaz.tuyaeu.com";
+					break;
+				case Region.India:
+					urlHost = "openapi.tuyain.com";
+					break;
+			}
+			return urlHost;
+		}
 
-        /// <summary>
-        /// Request to official API.
-        /// </summary>
-        /// <param name="uri">Method URI.</param>
-        /// <param name="body">Body of request if any.</param>
-        /// <param name="headers">Additional headers.</param>
-        /// <param name="noToken">Execute query without token.</param>
-        /// <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>JSON string with response.</returns>
-        public async Task<string> RequestAsync(Method method, string uri, string body = null, Dictionary<string, string> headers = null, bool noToken = false, bool forceTokenRefresh = false, CancellationToken cancellationToken = default)
+
+		/// <summary>
+		/// Request to official API.
+		/// </summary>
+		/// <param name="uri">Method URI.</param>
+		/// <param name="body">Body of request if any.</param>
+		/// <param name="headers">Additional headers.</param>
+		/// <param name="noToken">Execute query without token.</param>
+		/// <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>string with response.</returns>
+		/// <returns>JSON string with response.</returns>
+		public async Task<string> RequestAsync(Method method, string uri, string body = null, Dictionary<string, string> headers = null, bool noToken = false, bool forceTokenRefresh = false, CancellationToken cancellationToken = default,
+		ILog log = null)
+		{
+			var responseString = await RequestAsyncRaw (method, uri,body,headers,noToken,forceTokenRefresh,cancellationToken,log);
+			var root = JObject.Parse(responseString);
+			var success = root.GetValue("success").Value<bool>();
+			if (!success) throw new InvalidDataException(root.ContainsKey("msg") ? root.GetValue("msg").Value<string>() : null);
+			var result = root.GetValue("result").ToString();
+			return result;
+
+		}
+
+		/// <summary>
+		/// Request to official API.
+		/// </summary>
+		/// <param name="uri">Method URI.</param>
+		/// <param name="body">Body of request if any.</param>
+		/// <param name="headers">Additional headers.</param>
+		/// <param name="noToken">Execute query without token.</param>
+		/// <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+
+		/// <returns>string with response.</returns>
+		public async Task<string> RequestAsyncRaw(Method method, string uri, string body = null, Dictionary<string, string> headers = null, bool noToken = false, bool forceTokenRefresh = false, CancellationToken cancellationToken = default,
+					ILog log=null)
         {
             while (uri.StartsWith("/")) uri = uri.Substring(1);
             var urlHost = RegionToHost(region);
             var url = new Uri($"https://{urlHost}/{uri}");
-            var now = (DateTime.Now.ToUniversalTime() - new DateTime(1970, 1, 1)).TotalMilliseconds.ToString("0");
+            var now = (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds.ToString("0");
             string headersStr = "";
             if (headers == null)
             {
@@ -182,14 +209,13 @@ namespace com.clusterrr.TuyaNet
             if (body != null)
                 httpRequestMessage.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-            using (var response = await httpClient.SendAsync(httpRequestMessage, cancellationToken).ConfigureAwait(false))
+					log?.Debug(9, "TUYACloud", $"Sending to {httpRequestMessage.RequestUri} ,payload:{payload}, body:{body}");
+
+						using (var response = await httpClient.SendAsync(httpRequestMessage, cancellationToken).ConfigureAwait(false))
             {
                 var responseString = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                var root = JObject.Parse(responseString);
-                var success = root.GetValue("success").Value<bool>();
-                if (!success) throw new InvalidDataException(root.ContainsKey("msg") ? root.GetValue("msg").Value<string>() : null);
-                var result = root.GetValue("result").ToString();
-                return result;
+								log?.Debug(9, "TUYACloud", $"Response {responseString}");
+                return responseString;
             }
         }
 
@@ -216,26 +242,38 @@ namespace com.clusterrr.TuyaNet
         /// <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Device info.</returns>
-        public async Task<TuyaDeviceApiInfo> GetDeviceInfoAsync(string deviceId, bool forceTokenRefresh = false, CancellationToken cancellationToken = default)
+        public async Task<TuyaDeviceApiInfo> GetDeviceInfoAsync(string deviceId, bool forceTokenRefresh = false, CancellationToken cancellationToken = default,
+					ILog log=null)
         {
             var uri = $"v1.0/devices/{deviceId}";
-            var response = await RequestAsync(Method.GET, uri, forceTokenRefresh: forceTokenRefresh, cancellationToken: cancellationToken);
+            var response = await RequestAsync(Method.GET, uri, forceTokenRefresh: forceTokenRefresh, cancellationToken: cancellationToken,log: log);
             var device = JsonConvert.DeserializeObject<TuyaDeviceApiInfo>(response);
             return device;
         }
 
-        /// <summary>
-        /// Requests info about all registered devices, requires ID of any registered device.
-        /// </summary>
-        /// <param name="anyDeviceId">ID of any registered device.</param>
-        /// <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Array of devices info.</returns>
-        public async Task<TuyaDeviceApiInfo[]> GetAllDevicesInfoAsync(string anyDeviceId, bool forceTokenRefresh = false, CancellationToken cancellationToken = default)
+		public async Task<TuyaCommandApiResult> SetDeviceCommandAsync(string deviceId, string body, bool forceTokenRefresh = false, CancellationToken cancellationToken = default,
+				 ILog log = null)
+		{
+			var uri = $"v1.0/devices/{deviceId}/commands";
+			var response = await RequestAsyncRaw(Method.POST, uri,body: body, forceTokenRefresh: forceTokenRefresh, cancellationToken: cancellationToken, log: log);
+			var device = JsonConvert.DeserializeObject<TuyaCommandApiResult>(response);
+			return device;
+		}
+
+
+		/// <summary>
+		/// Requests info about all registered devices, requires ID of any registered device.
+		/// </summary>
+		/// <param name="anyDeviceId">ID of any registered device.</param>
+		/// <param name="forceTokenRefresh">Refresh access token even it's not expired.</param>
+		/// <param name="cancellationToken">Cancellation token.</param>
+		/// <returns>Array of devices info.</returns>
+		public async Task<TuyaDeviceApiInfo[]> GetAllDevicesInfoAsync(string anyDeviceId, bool forceTokenRefresh = false, CancellationToken cancellationToken = default,
+					ILog log = null)
         {
             var userId = (await GetDeviceInfoAsync(anyDeviceId, forceTokenRefresh: forceTokenRefresh, cancellationToken: cancellationToken)).UserId;
             var uri = $"v1.0/users/{userId}/devices";
-            var response = await RequestAsync(Method.GET, uri, forceTokenRefresh: false, cancellationToken: cancellationToken); // Token already refreshed
+            var response = await RequestAsync(Method.GET, uri, forceTokenRefresh: false, cancellationToken: cancellationToken, log: log); // Token already refreshed
             var devices = JsonConvert.DeserializeObject<TuyaDeviceApiInfo[]>(response);
             return devices;
         }

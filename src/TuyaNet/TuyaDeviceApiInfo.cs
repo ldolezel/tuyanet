@@ -73,7 +73,8 @@ namespace com.clusterrr.TuyaNet
 
         [JsonProperty("uuid")]
         public string Uuid { get; set; }
-
-        public override string ToString() => Name;
+				
+					
+				public override string ToString() => Name;
     }
 }

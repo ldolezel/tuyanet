@@ -26,7 +26,7 @@ namespace com.clusterrr.TuyaNet
         private TuyaProtocolVersion version;
 
         public TuyaParser(string localKey, TuyaProtocolVersion tuyaProtocolVersion) 
-            : this(Encoding.UTF8.GetBytes(localKey), tuyaProtocolVersion)
+            : this(localKey==null?null:Encoding.UTF8.GetBytes(localKey), tuyaProtocolVersion)
         {
         }
         
