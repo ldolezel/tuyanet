@@ -280,7 +280,6 @@ namespace com.clusterrr.TuyaNet
 						{
 							throw new Exception("Need invoke ConnectAsync before sendig.");
 						}
-
 						_log?.Debug(9, "TUYADEV", $"Sending: lenght={data.Length}, data={BitConverter.ToString(data)}");
 
 						await networkClientStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
