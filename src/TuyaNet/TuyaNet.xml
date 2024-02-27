@@ -228,6 +228,7 @@
             <summary>
             Sends raw data over to device and read response.
             </summary>
+            <param name="command">Command type</param>
             <param name="data">Raw data to send.</param>
             <param name="retries">Number of retries in case of network error (default - 2).</param>
             <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
