@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using com.clusterrr.TuyaNet.Extensions;
 using com.clusterrr.TuyaNet.Log;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace com.clusterrr.TuyaNet
 {
@@ -120,9 +121,8 @@ namespace com.clusterrr.TuyaNet
 		private string accessId;
 		private string apiSecret;
 		private SemaphoreSlim sem = new SemaphoreSlim(1);
-		private NetworkStream networkClientStream;
-		CancellationTokenSource _cancelTokenPeriodicPump;
 		CancellationTokenSource _cancelIdleRead;
+		private SemaphoreSlim _sendLock = new SemaphoreSlim(1);
 
 		/// <summary>
 		/// Fills JSON string with base fields required by most commands.
@@ -190,14 +190,20 @@ namespace com.clusterrr.TuyaNet
 
 		public bool IsConnected()
 		{
-			return client != null && client.Connected;
+			return client?.Connected == true;
 		}
 
 		public async Task SecureConnectAsync(CancellationToken cancellationToken = default)
 		{
 			_cancelIdleRead?.Cancel();
 			_cancelIdleRead = null;
+			await SecureConnectAsyncInternal(cancellationToken);
+			if (PermanentConnection) StartReadLoop();
+			return;
+		}
 
+		async Task SecureConnectAsyncInternal(CancellationToken cancellationToken)
+		{
 			if (client == null)
 				client = new TcpClient();
 			if (!client.ConnectAsync(IP, Port).Wait(ConnectionTimeout))
@@ -206,7 +212,7 @@ namespace com.clusterrr.TuyaNet
 				throw new IOException($"Connection to {IP}:{Port} timeout");
 			}
 			_log?.Debug(6, "TUYADEV", $"Connection to {IP}:{Port} opened");
-			networkClientStream = client.GetStream();
+			
 
 			if (ProtocolVersion == TuyaProtocolVersion.V34)
 			{
@@ -219,6 +225,8 @@ namespace com.clusterrr.TuyaNet
 						tmpLocalKey,
 						key
 						);
+
+				var networkClientStream = client.GetStream();
 				await networkClientStream.WriteAsync(request, cancellationToken).ConfigureAwait(false);
 				var receivedBytes = await ReceiveAsync(networkClientStream, 1, null, cancellationToken);
 				var response = parser.DecodeResponse(receivedBytes);
@@ -249,28 +257,37 @@ namespace com.clusterrr.TuyaNet
 					parser.SetupSessionKey(encryptedSessionKey);
 				}
 			}
-			if (PermanentConnection)
+
+		}
+
+		void StartReadLoop()
+		{
+			_cancelIdleRead = new CancellationTokenSource();
+
+			//start reading idles
+			_ = Task.Run(async () =>
 			{
-				_cancelIdleRead = new CancellationTokenSource();
-				
+				return;
 				//start reading idles
-				 _ = Task.Run(async () =>
-				 {
-					 return;
-					 //start reading idles
-					 while (!_cancelIdleRead.IsCancellationRequested)
-					 {
-						 _cancelTokenPeriodicPump=new CancellationTokenSource();
-						 var r = await SendAsyncInternal(TuyaCommand.UDP, (byte[])null, 1, 0, Timeout.Infinite, _cancelTokenPeriodicPump.Token,true);
-						 var c = _cancelTokenPeriodicPump;
-						 _cancelTokenPeriodicPump = null;
-						 c?.Dispose();
-						 await Task.Delay(NetworkErrorRetriesInterval, _cancelIdleRead.Token);
+				while (!_cancelIdleRead.IsCancellationRequested)
+				{
+					var inter = Math.Max(1000, NetworkErrorRetriesInterval);
+					using (await _sendLock.WaitDisposableAsync(inter, _cancelIdleRead.Token))
+					{
+						try
+						{
+							if (IsConnected())
+							{
+								_log?.Debug(8, "TUYADEV", $"SendAsync from periodic loop");
+								_ = await SendAsyncInternal(TuyaCommand.UDP, (byte[])null, 1, 0, 100, _cancelIdleRead.Token, true);
+							}
+						}
+						catch { }
+					}
+					await Task.Delay(inter, _cancelIdleRead.Token);
+				}
+			});
 
-					 }
-				 });
-
-			}
 		}
 
 		void CloseSocket()
@@ -282,8 +299,6 @@ namespace com.clusterrr.TuyaNet
 				c?.Close();
 				c?.Dispose();
 				
-				networkClientStream?.Dispose();
-				networkClientStream = null;
 			}
 			catch { }
 		}
@@ -291,6 +306,7 @@ namespace com.clusterrr.TuyaNet
 		public void Close()
 		{
 			_cancelIdleRead?.Cancel();
+			_cancelIdleRead?.Dispose();
 			_cancelIdleRead = null;
 			CloseSocket();
 			_log?.Debug(6,"TUYADEV", $"Device closed");
@@ -308,17 +324,57 @@ namespace com.clusterrr.TuyaNet
 		public async Task<byte[]> SendAsync(TuyaCommand command, byte[] data, int retries = 2, int nullRetries = 1, int? overrideRecvTimeout = null, 
 			CancellationToken cancellationToken = default)
 		{
-			_cancelTokenPeriodicPump?.Cancel();
-			return await SendAsyncInternal(command, data, retries, nullRetries, overrideRecvTimeout, cancellationToken,false);
+			using (await _sendLock.WaitDisposableAsync(cancellationToken))
+			{
+				if (!IsConnected())
+				{
+					await SecureConnectAsyncInternal(_cancelIdleRead.Token);
+				}
+				_log?.Debug(8, "TUYADEV", $"SendAsync from external call: lenght={data.Length}");
+				return await SendAsyncInternal(command, data, retries, nullRetries, overrideRecvTimeout, cancellationToken, false);
+			}
 		}
+
+		async Task<byte[]> ClearReadExisting(NetworkStream networkClientStream, CancellationToken cancellationToken)
+		{
+			try
+			{
+				if (networkClientStream == null) return null;
+				byte[] buffer = new byte[256];
+				MemoryStream stream = new MemoryStream();
+				while (networkClientStream.DataAvailable)
+				{
+					var len = await networkClientStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
+					if (len>0)
+					{
+						stream.Write(buffer, 0, len);
+					}
+				}
+				return stream.ToArray();
+			}
+			catch { return null; }
+		}
+
+
 		async Task<byte[]> SendAsyncInternal(TuyaCommand command, byte[] data, int retries , int nullRetries , 
 			int? overrideRecvTimeout,
 			CancellationToken cancellationToken, bool ignoreCanceledOrTimeout)
 		{
 			Exception lastException = null;
+
+			var networkClientStream = client?.GetStream();
+			if (networkClientStream == null)
+			{
+				throw new Exception("Need invoke ConnectAsync before sendig.");
+			}
+
+			//Existing Empty data
+			_ = ClearReadExisting(networkClientStream, cancellationToken);
+
+
 			while (retries-- > 0)
 			{
-				if (!PermanentConnection || client?.Connected == false)
+				if (client?.Connected == false)
 				{
 					CloseSocket();
 				}
@@ -326,20 +382,18 @@ namespace com.clusterrr.TuyaNet
 				{
 					using (await sem.WaitDisposableAsync(cancellationToken))
 					{
-						if (networkClientStream == null)
-						{
-							throw new Exception("Need invoke ConnectAsync before sendig.");
-						}
+
+
 						if (data != null)
 						{
 							_log?.Debug(9, "TUYADEV", $"Sending: lenght={data.Length}, data={BitConverter.ToString(data)}");
 							await networkClientStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
 						}
-						var str = client.GetStream();
 						byte[] response = null;
 						while (response == null)
 						{
-							var responseRaw = await ReceiveAsync(str, nullRetries, overrideRecvTimeout, cancellationToken);
+							var responseRaw = await ReceiveAsync(networkClientStream, nullRetries, overrideRecvTimeout, cancellationToken);
+
 
 
 							var responseParsed = parser.DecodeResponse(responseRaw);
@@ -377,16 +431,24 @@ namespace com.clusterrr.TuyaNet
 				}
 				finally
 				{
-					if (!PermanentConnection || client?.Connected == false || lastException != null)
+
+					if (!IsConnected())
 					{
 						CloseSocket();
 						throw lastException ?? new Exception("Not connected");
+					}
+					if (!PermanentConnection) CloseSocket();
+					if (lastException != null)
+					{
+						//CloseSocket();
+						throw lastException;
 					}
 				}
 				await Task.Delay(NetworkErrorRetriesInterval, cancellationToken);
 			}
 			throw lastException;
 		}
+
 
 		private async Task<byte[]> ReceiveAsync(NetworkStream stream, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
 		{
@@ -415,9 +477,9 @@ namespace com.clusterrr.TuyaNet
 					}
 					else if (t == readTask)
 					{
-						bytes = await readTask;
+						bytes = await readTask.ConfigureAwait(false);
 					}
-					_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer)}");
+					_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer?.Take(bytes)?.ToArray())}");
 					ms.Write(buffer, 0, bytes);
 					var receivedArray = ms.ToArray();
 					if (receivedArray.Length > 4)
@@ -440,6 +502,85 @@ namespace com.clusterrr.TuyaNet
 			}
 			return result;
 		}
+		/*private async Task<byte[]> ReceiveAsync(NetworkStream stream, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
+		{
+			var isEnding = false;
+			byte[] result;
+			byte[] buffer = new byte[1024];
+			using (var ms = new MemoryStream())
+			{
+				int length = buffer.Length;
+				while (!isEnding )// && !stream.DataAvailable
+				{
+					int bytes=0;
+					try
+					{
+						try
+						{
+							// Create a CancellationTokenSource
+							CancellationTokenSource cts = new CancellationTokenSource();
+
+							// Start reading asynchronously
+							Task<int> readTask = stream.ReadAsync(buffer, 0, buffer.Length);
+
+							// Simulate a cancellation after a certain delay (e.g., 5000 milliseconds)
+							Task.Delay(overrideRecvTimeout ?? ReceiveTimeout).ContinueWith(_ => cts.Cancel());
+
+							try
+							{
+								// Wait for either the read to complete or the cancellation token to be triggered
+								var bytes= await Task.WhenAny(readTask, Task.Delay(-1, cts.Token));
+
+								if (bytes > 0)
+								{
+									_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer?.Take(bytes)?.ToArray())}");
+								}
+								else
+								{
+									_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}");
+								}
+							}
+
+
+
+							bytes = await stream.ReadAsync(buffer, 0, length, linkedCts.Token);
+							
+						}
+						catch (OperationCanceledException)
+						{
+							_log?.Debug(9, "TUYADEV", $"Received: timeout");
+							throw new TimeoutException();
+						}
+					}
+					finally
+					{
+							// close alll CancellationTokenSource
+							timeoutCancellationTokenSource?.Dispose();
+							linkedCts?.Dispose();
+					}
+					
+					ms.Write(buffer, 0, bytes);
+					var receivedArray = ms.ToArray();
+					if (receivedArray.Length > 4)
+					{
+						var packetEnding = receivedArray.Skip(receivedArray.Length - 4).Take(4).ToArray();
+						isEnding = TuyaParser.SUFFIX.SequenceEqual(packetEnding);
+					}
+					else
+					{
+						isEnding = true;
+					}
+					}
+				result = ms.ToArray();
+			}
+			if ((result.Length <= 28) && (nullRetries > 0)) // empty response
+			{
+				await Task.Delay(NullRetriesInterval, cancellationToken);
+				result = await ReceiveAsync(stream, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
+				_log?.Debug(9, "TUYADEV", $"Received: lenght={result.Length}, data={BitConverter.ToString(result)}");
+			}
+			return result;
+		}*/
 
 		/// <summary>
 		/// Requests current DPs status.

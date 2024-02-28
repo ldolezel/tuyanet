@@ -21,7 +21,14 @@ namespace com.clusterrr.SemaphoreLock
             //GC.KeepAlive(l);
             return l;
         }
-    }
+				public static async Task<SemaphoreLock> WaitDisposableAsync(this SemaphoreSlim semaphore, int timeout,CancellationToken cancellationToken = default)
+				{
+					var l = new SemaphoreLock(semaphore);
+					await semaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+					//GC.KeepAlive(l);
+					return l;
+				}
+	}
 
     public class SemaphoreLock : IDisposable
     {

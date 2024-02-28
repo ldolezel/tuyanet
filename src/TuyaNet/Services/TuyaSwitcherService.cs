@@ -17,13 +17,13 @@ namespace com.clusterrr.TuyaNet.Services
 		private readonly TuyaDevice device;
 		ILog _log = null;
 
-		public TuyaSwitcherService(TuyaDeviceInfo deviceInfo, ILog log = null)
+		public TuyaSwitcherService(TuyaDeviceInfo deviceInfo, bool permanentConnection=false, ILog log = null)
 		{
 			_log=log;
-			this.device = GetDevice(deviceInfo,log);
+			this.device = GetDevice(deviceInfo, permanentConnection, log);
 		}
 
-		public static TuyaDevice GetDevice(TuyaDeviceInfo tuyaDeviceInfo, ILog log = null)
+		public static TuyaDevice GetDevice(TuyaDeviceInfo tuyaDeviceInfo, bool permanentConnection, ILog log = null)
 		{
 			var allVersions = EnumExtensions.GetTuyaVersionsValues()
 					.Select(x => new { ver = x.ToString().Replace("V", ""), value = x });
@@ -40,7 +40,7 @@ namespace com.clusterrr.TuyaNet.Services
 					protocolVersion: deviceVersion.Value, 
 					log: log);
 					
-			dev.PermanentConnection = true;
+			dev.PermanentConnection = permanentConnection;
 
 			return dev;
 		}
