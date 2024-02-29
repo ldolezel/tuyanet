@@ -228,9 +228,8 @@ namespace com.clusterrr.TuyaNet
 						key
 						);
 
-				var networkClientStream = client.GetStream();
-				await networkClientStream.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-				var receivedBytes = Receive(networkClientStream, 1, null, cancellationToken);
+				client.Client.Send(request);
+				var receivedBytes = Receive(client, 1, null, cancellationToken);
 				var response = parser.DecodeResponse(receivedBytes);
 				if ((int)response.Command == (int)TuyaCommand.SESS_KEY_NEG_RES)
 				{
@@ -247,7 +246,7 @@ namespace com.clusterrr.TuyaNet
 							parser.GetHashSha256(tmpRemoteKey),
 							key
 					);
-					await networkClientStream.WriteAsync(requestFinish, cancellationToken).ConfigureAwait(false);
+					client.Client.Send(requestFinish);
 
 					var sessionKey = new byte[tmpLocalKey.Length];
 					for (var i = 0; i < tmpLocalKey.Length; i++)
@@ -289,6 +288,7 @@ namespace com.clusterrr.TuyaNet
 		/*
 		 * 	Some TUYA devices immediately close the TCP connection after sending the response 
 		 * 	and the original async implementation can't read it and raises exception because of closed socket 
+		 * 	NetworkStream data is also unavaiable at this time.
 		 * 	So I decided to rewrite it
 		 */
 
@@ -316,12 +316,7 @@ namespace com.clusterrr.TuyaNet
 				_log?.Debug(8, "TUYADEV", $"Reconnecting...");
 				SecureConnectAsyncInternal(cancellationToken).Wait();
 			}
-
-			var networkClientStream = client?.GetStream();
-			if (networkClientStream == null)
-			{
-				throw new Exception("Device is not connected.");
-			}
+			if (!IsConnected()) throw new Exception("Not connected");
 
 			Exception lastException = null;
 			try
@@ -331,17 +326,17 @@ namespace com.clusterrr.TuyaNet
 					if (data != null)
 					{
 						_log?.Debug(9, "TUYADEV", $"Sending: lenght={data.Length}, data={BitConverter.ToString(data)}");
-						networkClientStream.Write(data, 0, data.Length);
+						client.Client.Send(data);
+						//networkClientStream.Write(data, 0, data.Length);
 					}
 					byte[] response = null;
 
 					while (response == null)
 					{
-						var responseRaw = Receive(networkClientStream, nullRetries, overrideRecvTimeout, cancellationToken);
+						var responseRaw = Receive(client, nullRetries, overrideRecvTimeout, cancellationToken);
 						var responseParsed = parser.DecodeResponse(responseRaw);
-						_log?.Debug(8, "TUYADEV", $"Received command: {responseParsed.Command.GetNames()}");
 						_log?.Debug(8, "TUYADEV", $"Received json: {responseParsed.Json}");
-
+						_log?.Debug(8, "TUYADEV", $"Received command: {responseParsed.Command.GetNames()}");
 						//for protocol v3.4 need wait response by command
 						if (responseParsed.Command == command ||
 								ProtocolVersion != TuyaProtocolVersion.V34)
@@ -372,21 +367,21 @@ namespace com.clusterrr.TuyaNet
 				}
 			}
 		}
-		byte[] Receive(NetworkStream stream, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
+		byte[] Receive(TcpClient client, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
 		{
 			var isEnding = false;
 			byte[] result;
-			byte[] buffer = new byte[1024];
+			byte[] buffer = new byte[512];
 			using (var ms = new MemoryStream())
 			{
 				int length = buffer.Length;
 				int timeout = overrideRecvTimeout ?? ReceiveTimeout;
-				stream.ReadTimeout = timeout;
+				client.Client.ReceiveTimeout = timeout;
 				Stopwatch sw = Stopwatch.StartNew();
 				while (!isEnding)
 				{
 					var timeoutCancellationTokenSource = new CancellationTokenSource();
-					var bytes = stream.Read(buffer, 0, length);
+					var bytes = client.Client.Receive(buffer, 0, length, SocketFlags.None);
 					if (bytes > 0)
 					{
 						ms.Write(buffer, 0, bytes);
@@ -413,7 +408,7 @@ namespace com.clusterrr.TuyaNet
 			if ((result.Length <= 28) && (nullRetries > 0)) // empty response
 			{
 				Task.Delay(NullRetriesInterval, cancellationToken).Wait();
-				result = Receive(stream, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
+				result = Receive(client, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
 			}
 			return result;
 		}
