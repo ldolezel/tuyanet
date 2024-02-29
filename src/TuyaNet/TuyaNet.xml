@@ -212,29 +212,28 @@
             <param name="data">Raw data to parse and decrypt.</param>
             <returns>Instance of TuyaLocalResponse.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SendAsync(com.clusterrr.TuyaNet.TuyaCommand,System.String,System.Int32,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SendAsync(com.clusterrr.TuyaNet.TuyaCommand,System.String,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
             <summary>
             Sends JSON string to device and reads response.
             </summary>
             <param name="command">Tuya command ID.</param>
             <param name="json">JSON string.</param>
-            <param name="retries">Number of retries in case of network error (default - 2).</param>
             <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
             <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Parsed and decrypred received data as instance of TuyaLocalResponse.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SendAsync(com.clusterrr.TuyaNet.TuyaCommand,System.Byte[],System.Int32,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SendAndRead(com.clusterrr.TuyaNet.TuyaCommand,System.Byte[],System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
             <summary>
-            Sends raw data over to device and read response.
+            Some TYUA devices
             </summary>
-            <param name="command">Command type</param>
-            <param name="data">Raw data to send.</param>
-            <param name="retries">Number of retries in case of network error (default - 2).</param>
-            <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
-            <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
-            <param name="cancellationToken">Cancellation token.</param>
-            <returns>Received data (raw).</returns>
+            <param name="command"></param>
+            <param name="data"></param>
+            <param name="nullRetries"></param>
+            <param name="overrideRecvTimeout"></param>
+            <param name="cancellationToken"></param>
+            <returns></returns>
+            <exception cref="T:System.Exception"></exception>
         </member>
         <member name="M:com.clusterrr.TuyaNet.TuyaDevice.GetDpsAsync(System.Int32,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
             <summary>
@@ -246,37 +245,34 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Dictionary of DP numbers and values.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SetDpAsync(System.Int32,System.Object,System.Int32,System.Int32,System.Nullable{System.Int32},System.Boolean,System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SetDpAsync(System.Int32,System.Object,System.Int32,System.Nullable{System.Int32},System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Sets single DP to specified value.
             </summary>
             <param name="dp">DP number.</param>
             <param name="value">Value.</param>
-            <param name="retries">Number of retries in case of network error (default - 2).</param>
             <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
             <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
             <param name="allowEmptyResponse">Do not throw exception on empty Response</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Dictionary of DP numbers and values.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SetDpsAsync(System.Collections.Generic.Dictionary{System.Int32,System.Object},System.Int32,System.Int32,System.Nullable{System.Int32},System.Boolean,System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SetDpsAsync(System.Collections.Generic.Dictionary{System.Int32,System.Object},System.Int32,System.Nullable{System.Int32},System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Sets DPs to specified value.
             </summary>
             <param name="dps">Dictionary of DP numbers and values to set.</param>
-            <param name="retries">Number of retries in case of network error (default - 2).</param>
             <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
             <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
             <param name="allowEmptyResponse">Do not throw exception on empty Response</param>
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Dictionary of DP numbers and values.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.UpdateDpsAsync(System.Collections.Generic.IEnumerable{System.Int32},System.Int32,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.UpdateDpsAsync(System.Collections.Generic.IEnumerable{System.Int32},System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
             <summary>
             Update DP values.
             </summary>
             <param name="dpIds">DP identificators to update (can be empty for some devices).</param>
-            <param name="retries">Number of retries in case of network error (default - 2).</param>
             <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
             <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
             <param name="cancellationToken">Cancellation token.</param>
@@ -356,7 +352,7 @@
             <param name="cancellationToken">Cancellation token.</param>
             <returns>Button code as Base64 string.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaIRControl.SendButtonCodeAsync(System.String,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaIRControl.SendButtonCodeAsync(System.String,System.Nullable{System.Int32},System.Threading.CancellationToken)">
             <summary>
             Sends button code.
             </summary>

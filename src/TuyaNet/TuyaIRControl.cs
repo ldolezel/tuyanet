@@ -119,7 +119,7 @@ namespace com.clusterrr.TuyaNet
         /// </summary>
         /// <param name="buttonCode">Button code in Base64 encoding.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task SendButtonCodeAsync(string buttonCode, int retries = 2, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
+        public async Task SendButtonCodeAsync(string buttonCode,int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
         {
             var subCmd = new Dictionary<string, object>()
             {
@@ -129,7 +129,7 @@ namespace com.clusterrr.TuyaNet
                 { NSDP_DELAY, 0 }
             };
             var subCmdJson = JsonConvert.SerializeObject(subCmd);
-            await SetDpsAsync(new Dictionary<int, object>() { { 201, subCmdJson } }, retries: retries,
+            await SetDpsAsync(new Dictionary<int, object>() { { 201, subCmdJson } },
                 nullRetries: 0, overrideRecvTimeout: overrideRecvTimeout, allowEmptyResponse: true, cancellationToken: cancellationToken);
         }
 

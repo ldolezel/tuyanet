@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using com.clusterrr.TuyaNet.Extensions;
 using com.clusterrr.TuyaNet.Log;
 using System.Runtime.InteropServices.ComTypes;
+using System.Diagnostics;
 
 namespace com.clusterrr.TuyaNet
 {
@@ -179,13 +180,15 @@ namespace com.clusterrr.TuyaNet
 		/// </summary>
 		/// <param name="command">Tuya command ID.</param>
 		/// <param name="json">JSON string.</param>
-		/// <param name="retries">Number of retries in case of network error (default - 2).</param>
 		/// <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
 		/// <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
 		/// <param name="cancellationToken">Cancellation token.</param>
 		/// <returns>Parsed and decrypred received data as instance of TuyaLocalResponse.</returns>
-		public async Task<TuyaLocalResponse> SendAsync(TuyaCommand command, string json, int retries = 2, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
-				=> DecodeResponse(await SendAsync(command, EncodeRequest(command, json), retries, nullRetries, overrideRecvTimeout, cancellationToken));
+		public async Task<TuyaLocalResponse> SendAsync(TuyaCommand command, string json, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
+		{
+			return await Task.Run(() => DecodeResponse(SendAndRead(command, EncodeRequest(command, json), nullRetries, overrideRecvTimeout, cancellationToken)));
+		}
+				
 
 
 		public bool IsConnected()
@@ -198,7 +201,6 @@ namespace com.clusterrr.TuyaNet
 			_cancelIdleRead?.Cancel();
 			_cancelIdleRead = null;
 			await SecureConnectAsyncInternal(cancellationToken);
-			if (PermanentConnection) StartReadLoop();
 			return;
 		}
 
@@ -228,7 +230,7 @@ namespace com.clusterrr.TuyaNet
 
 				var networkClientStream = client.GetStream();
 				await networkClientStream.WriteAsync(request, cancellationToken).ConfigureAwait(false);
-				var receivedBytes = await ReceiveAsync(networkClientStream, 1, null, cancellationToken);
+				var receivedBytes = Receive(networkClientStream, 1, null, cancellationToken);
 				var response = parser.DecodeResponse(receivedBytes);
 				if ((int)response.Command == (int)TuyaCommand.SESS_KEY_NEG_RES)
 				{
@@ -260,35 +262,7 @@ namespace com.clusterrr.TuyaNet
 
 		}
 
-		void StartReadLoop()
-		{
-			_cancelIdleRead = new CancellationTokenSource();
-
-			//start reading idles
-			_ = Task.Run(async () =>
-			{
-				return;
-				//start reading idles
-				while (!_cancelIdleRead.IsCancellationRequested)
-				{
-					var inter = Math.Max(1000, NetworkErrorRetriesInterval);
-					using (await _sendLock.WaitDisposableAsync(inter, _cancelIdleRead.Token))
-					{
-						try
-						{
-							if (IsConnected())
-							{
-								_log?.Debug(8, "TUYADEV", $"SendAsync from periodic loop");
-								_ = await SendAsyncInternal(TuyaCommand.UDP, (byte[])null, 1, 0, 100, _cancelIdleRead.Token, true);
-							}
-						}
-						catch { }
-					}
-					await Task.Delay(inter, _cancelIdleRead.Token);
-				}
-			});
-
-		}
+	
 
 		void CloseSocket()
 		{
@@ -311,146 +285,94 @@ namespace com.clusterrr.TuyaNet
 			CloseSocket();
 			_log?.Debug(6,"TUYADEV", $"Device closed");
 		}
-		/// <summary>
-		/// Sends raw data over to device and read response.
-		/// </summary>
-		/// <param name="command">Command type</param>
-		/// <param name="data">Raw data to send.</param>
-		/// <param name="retries">Number of retries in case of network error (default - 2).</param>
-		/// <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
-		/// <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
-		/// <param name="cancellationToken">Cancellation token.</param>
-		/// <returns>Received data (raw).</returns>
-		public async Task<byte[]> SendAsync(TuyaCommand command, byte[] data, int retries = 2, int nullRetries = 1, int? overrideRecvTimeout = null, 
+
+		/*
+		 * 	Some TUYA devices immediately close the TCP connection after sending the response 
+		 * 	and the original async implementation can't read it and raises exception because of closed socket 
+		 * 	So I decided to rewrite it
+		 */
+
+		public async Task<byte[]> SendAsync(TuyaCommand command, byte[] data, int nullRetries = 1, int? overrideRecvTimeout = null,
 			CancellationToken cancellationToken = default)
 		{
-			using (await _sendLock.WaitDisposableAsync(cancellationToken))
-			{
-				if (!IsConnected())
-				{
-					await SecureConnectAsyncInternal(_cancelIdleRead.Token);
-				}
-				_log?.Debug(8, "TUYADEV", $"SendAsync from external call: lenght={data.Length}");
-				return await SendAsyncInternal(command, data, retries, nullRetries, overrideRecvTimeout, cancellationToken, false);
-			}
+			return await Task.Run(()=>SendAndRead(command, data, nullRetries, overrideRecvTimeout, cancellationToken));
 		}
 
-		async Task<byte[]> ClearReadExisting(NetworkStream networkClientStream, CancellationToken cancellationToken)
+		/// <summary>
+		/// Some TYUA devices
+		/// </summary>
+		/// <param name="command"></param>
+		/// <param name="data"></param>
+		/// <param name="nullRetries"></param>
+		/// <param name="overrideRecvTimeout"></param>
+		/// <param name="cancellationToken"></param>
+		/// <returns></returns>
+		/// <exception cref="Exception"></exception>
+		public byte[] SendAndRead(TuyaCommand command, byte[] data, int nullRetries = 1, int? overrideRecvTimeout = null,
+			CancellationToken cancellationToken = default)
 		{
-			try
+			if (!IsConnected())
 			{
-				if (networkClientStream == null) return null;
-				byte[] buffer = new byte[256];
-				MemoryStream stream = new MemoryStream();
-				while (networkClientStream.DataAvailable)
-				{
-					var len = await networkClientStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
-					if (len>0)
-					{
-						stream.Write(buffer, 0, len);
-					}
-				}
-				return stream.ToArray();
+				_log?.Debug(8, "TUYADEV", $"Reconnecting...");
+				SecureConnectAsyncInternal(cancellationToken).Wait();
 			}
-			catch { return null; }
-		}
-
-
-		async Task<byte[]> SendAsyncInternal(TuyaCommand command, byte[] data, int retries , int nullRetries , 
-			int? overrideRecvTimeout,
-			CancellationToken cancellationToken, bool ignoreCanceledOrTimeout)
-		{
-			Exception lastException = null;
 
 			var networkClientStream = client?.GetStream();
 			if (networkClientStream == null)
 			{
-				throw new Exception("Need invoke ConnectAsync before sendig.");
+				throw new Exception("Device is not connected.");
 			}
 
-			//Existing Empty data
-			_ = ClearReadExisting(networkClientStream, cancellationToken);
-
-
-			while (retries-- > 0)
+			Exception lastException = null;
+			try
 			{
-				if (client?.Connected == false)
-				{
-					CloseSocket();
-				}
 				try
 				{
-					using (await sem.WaitDisposableAsync(cancellationToken))
+					if (data != null)
 					{
-
-
-						if (data != null)
-						{
-							_log?.Debug(9, "TUYADEV", $"Sending: lenght={data.Length}, data={BitConverter.ToString(data)}");
-							await networkClientStream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
-						}
-						byte[] response = null;
-						while (response == null)
-						{
-							var responseRaw = await ReceiveAsync(networkClientStream, nullRetries, overrideRecvTimeout, cancellationToken);
-
-
-
-							var responseParsed = parser.DecodeResponse(responseRaw);
-							//Console.WriteLine($"Command: {responseParsed.Command.GetNames()}");
-							//Console.WriteLine($"Json: {responseParsed.Json}");
-							//Console.WriteLine($"Size payload: {responseParsed.Payload?.Length}");
-
-							_log?.Debug(8, "TUYADEV", $"Received command: {responseParsed.Command.GetNames()}");
-							_log?.Debug(8, "TUYADEV", $"Received json: {responseParsed.Json}");
-
-							//for protocol v3.4 need wait response by command
-							if (responseParsed.Command == command ||
-									ProtocolVersion != TuyaProtocolVersion.V34)
-								response = responseRaw;
-						}
-						return response;
+						_log?.Debug(9, "TUYADEV", $"Sending: lenght={data.Length}, data={BitConverter.ToString(data)}");
+						networkClientStream.Write(data, 0, data.Length);
 					}
-				}
-				catch (Exception ex) when (ex is IOException or TimeoutException or SocketException)
-				{
-					// sockets sometimes drop the connection unexpectedly, so let's 
-					// retry at least once
-					if (!ignoreCanceledOrTimeout || (ignoreCanceledOrTimeout && ex is not TimeoutException))
+					byte[] response = null;
+
+					while (response == null)
 					{
-						lastException = ex;
+						var responseRaw = Receive(networkClientStream, nullRetries, overrideRecvTimeout, cancellationToken);
+						var responseParsed = parser.DecodeResponse(responseRaw);
+						_log?.Debug(8, "TUYADEV", $"Received command: {responseParsed.Command.GetNames()}");
+						_log?.Debug(8, "TUYADEV", $"Received json: {responseParsed.Json}");
+
+						//for protocol v3.4 need wait response by command
+						if (responseParsed.Command == command ||
+								ProtocolVersion != TuyaProtocolVersion.V34)
+							response = responseRaw;
 					}
+
+					return response;
 				}
 				catch (Exception ex)
 				{
-					if (!ignoreCanceledOrTimeout || (ignoreCanceledOrTimeout && ex is not OperationCanceledException))
-					{
-						_log?.Error("TUYADEV", ex.Message);
-						throw ex;
-					}
+					lastException = ex;
+					_log?.Error("TUYADEV", ex.Message);
+					throw ex;
 				}
-				finally
-				{
-
-					if (!IsConnected())
-					{
-						CloseSocket();
-						throw lastException ?? new Exception("Not connected");
-					}
-					if (!PermanentConnection) CloseSocket();
-					if (lastException != null)
-					{
-						//CloseSocket();
-						throw lastException;
-					}
-				}
-				await Task.Delay(NetworkErrorRetriesInterval, cancellationToken);
 			}
-			throw lastException;
+			finally
+			{
+				if (!IsConnected())
+				{
+					CloseSocket();
+					throw lastException ?? new Exception("Not connected");
+				}
+				if (!PermanentConnection) CloseSocket();
+				if (lastException != null)
+				{
+					//CloseSocket();
+					throw lastException;
+				}
+			}
 		}
-
-
-		private async Task<byte[]> ReceiveAsync(NetworkStream stream, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
+		byte[] Receive(NetworkStream stream, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
 		{
 			var isEnding = false;
 			byte[] result;
@@ -458,129 +380,43 @@ namespace com.clusterrr.TuyaNet
 			using (var ms = new MemoryStream())
 			{
 				int length = buffer.Length;
-				while (!isEnding /*&& !stream.DataAvailable*/)
+				int timeout = overrideRecvTimeout ?? ReceiveTimeout;
+				stream.ReadTimeout = timeout;
+				Stopwatch sw = Stopwatch.StartNew();
+				while (!isEnding)
 				{
 					var timeoutCancellationTokenSource = new CancellationTokenSource();
-					var readTask = stream.ReadAsync(buffer, 0, length, cancellationToken: cancellationToken);
-					var timeoutTask = Task.Delay(overrideRecvTimeout ?? ReceiveTimeout, cancellationToken: timeoutCancellationTokenSource.Token);
-					var t = await Task.WhenAny(readTask, timeoutTask).ConfigureAwait(false);
-					timeoutCancellationTokenSource.Cancel();
-					int bytes = 0;
-					if (t == timeoutTask)
+					var bytes = stream.Read(buffer, 0, length);
+					if (bytes > 0)
 					{
-						if (stream.DataAvailable)
-						{
-							bytes = await stream.ReadAsync(buffer, 0, length, cancellationToken);
-						}
-						else
-							throw new TimeoutException();
+						ms.Write(buffer, 0, bytes);
+						_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer?.Take(bytes)?.ToArray())}");
 					}
-					else if (t == readTask)
-					{
-						bytes = await readTask.ConfigureAwait(false);
-					}
-					_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer?.Take(bytes)?.ToArray())}");
-					ms.Write(buffer, 0, bytes);
 					var receivedArray = ms.ToArray();
 					if (receivedArray.Length > 4)
 					{
 						var packetEnding = receivedArray.Skip(receivedArray.Length - 4).Take(4).ToArray();
 						isEnding = TuyaParser.SUFFIX.SequenceEqual(packetEnding);
 					}
-					else
+					/*	else
+						{
+							isEnding = true;
+						}*/
+					if (sw.ElapsedMilliseconds > timeout)
 					{
-						isEnding = true;
+						throw new TimeoutException();
 					}
 				}
 				result = ms.ToArray();
 			}
+
 			if ((result.Length <= 28) && (nullRetries > 0)) // empty response
 			{
-				await Task.Delay(NullRetriesInterval, cancellationToken);
-				result = await ReceiveAsync(stream, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
-				_log?.Debug(9, "TUYADEV", $"Received: lenght={result.Length}, data={BitConverter.ToString(result)}");
+				Task.Delay(NullRetriesInterval, cancellationToken).Wait();
+				result = Receive(stream, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
 			}
 			return result;
 		}
-		/*private async Task<byte[]> ReceiveAsync(NetworkStream stream, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
-		{
-			var isEnding = false;
-			byte[] result;
-			byte[] buffer = new byte[1024];
-			using (var ms = new MemoryStream())
-			{
-				int length = buffer.Length;
-				while (!isEnding )// && !stream.DataAvailable
-				{
-					int bytes=0;
-					try
-					{
-						try
-						{
-							// Create a CancellationTokenSource
-							CancellationTokenSource cts = new CancellationTokenSource();
-
-							// Start reading asynchronously
-							Task<int> readTask = stream.ReadAsync(buffer, 0, buffer.Length);
-
-							// Simulate a cancellation after a certain delay (e.g., 5000 milliseconds)
-							Task.Delay(overrideRecvTimeout ?? ReceiveTimeout).ContinueWith(_ => cts.Cancel());
-
-							try
-							{
-								// Wait for either the read to complete or the cancellation token to be triggered
-								var bytes= await Task.WhenAny(readTask, Task.Delay(-1, cts.Token));
-
-								if (bytes > 0)
-								{
-									_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}, data={BitConverter.ToString(buffer?.Take(bytes)?.ToArray())}");
-								}
-								else
-								{
-									_log?.Debug(9, "TUYADEV", $"Received: lenght={bytes}");
-								}
-							}
-
-
-
-							bytes = await stream.ReadAsync(buffer, 0, length, linkedCts.Token);
-							
-						}
-						catch (OperationCanceledException)
-						{
-							_log?.Debug(9, "TUYADEV", $"Received: timeout");
-							throw new TimeoutException();
-						}
-					}
-					finally
-					{
-							// close alll CancellationTokenSource
-							timeoutCancellationTokenSource?.Dispose();
-							linkedCts?.Dispose();
-					}
-					
-					ms.Write(buffer, 0, bytes);
-					var receivedArray = ms.ToArray();
-					if (receivedArray.Length > 4)
-					{
-						var packetEnding = receivedArray.Skip(receivedArray.Length - 4).Take(4).ToArray();
-						isEnding = TuyaParser.SUFFIX.SequenceEqual(packetEnding);
-					}
-					else
-					{
-						isEnding = true;
-					}
-					}
-				result = ms.ToArray();
-			}
-			if ((result.Length <= 28) && (nullRetries > 0)) // empty response
-			{
-				await Task.Delay(NullRetriesInterval, cancellationToken);
-				result = await ReceiveAsync(stream, nullRetries - 1, overrideRecvTimeout: overrideRecvTimeout, cancellationToken);
-				_log?.Debug(9, "TUYADEV", $"Received: lenght={result.Length}, data={BitConverter.ToString(result)}");
-			}
-			return result;
-		}*/
 
 		/// <summary>
 		/// Requests current DPs status.
@@ -593,7 +429,7 @@ namespace com.clusterrr.TuyaNet
 		public async Task<Dictionary<int, object>> GetDpsAsync(int retries = 5, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
 		{
 			var requestJson = FillJson(null);
-			var response = await SendAsync(TuyaCommand.DP_QUERY, requestJson, retries, nullRetries, overrideRecvTimeout, cancellationToken);
+			var response = await SendAsync(TuyaCommand.DP_QUERY, requestJson, nullRetries, overrideRecvTimeout, cancellationToken);
 			if (string.IsNullOrEmpty(response.Json))
 				throw new InvalidDataException("Response is empty");
 			var root = JObject.Parse(response.Json);
@@ -606,26 +442,24 @@ namespace com.clusterrr.TuyaNet
 		/// </summary>
 		/// <param name="dp">DP number.</param>
 		/// <param name="value">Value.</param>
-		/// <param name="retries">Number of retries in case of network error (default - 2).</param>
 		/// <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
 		/// <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
 		/// <param name="allowEmptyResponse">Do not throw exception on empty Response</param>
 		/// <param name="cancellationToken">Cancellation token.</param>
 		/// <returns>Dictionary of DP numbers and values.</returns>
-		public async Task<Dictionary<int, object>> SetDpAsync(int dp, object value, int retries = 2, int nullRetries = 1, int? overrideRecvTimeout = null, bool allowEmptyResponse = false, CancellationToken cancellationToken = default)
-				=> await SetDpsAsync(new Dictionary<int, object> { { dp, value } }, retries, nullRetries, overrideRecvTimeout, allowEmptyResponse, cancellationToken);
+		public async Task<Dictionary<int, object>> SetDpAsync(int dp, object value,  int nullRetries = 1, int? overrideRecvTimeout = null, bool allowEmptyResponse = false, CancellationToken cancellationToken = default)
+				=> await SetDpsAsync(new Dictionary<int, object> { { dp, value } }, nullRetries, overrideRecvTimeout, allowEmptyResponse, cancellationToken);
 
 		/// <summary>
 		/// Sets DPs to specified value.
 		/// </summary>
 		/// <param name="dps">Dictionary of DP numbers and values to set.</param>
-		/// <param name="retries">Number of retries in case of network error (default - 2).</param>
 		/// <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
 		/// <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
 		/// <param name="allowEmptyResponse">Do not throw exception on empty Response</param>
 		/// <param name="cancellationToken">Cancellation token.</param>
 		/// <returns>Dictionary of DP numbers and values.</returns>
-		public async Task<Dictionary<int, object>> SetDpsAsync(Dictionary<int, object> dps, int retries = 2, int nullRetries = 1, int? overrideRecvTimeout = null, bool allowEmptyResponse = false, CancellationToken cancellationToken = default)
+		public async Task<Dictionary<int, object>> SetDpsAsync(Dictionary<int, object> dps, int nullRetries = 1, int? overrideRecvTimeout = null, bool allowEmptyResponse = false, CancellationToken cancellationToken = default)
 		{
 			var cmd = new Dictionary<string, object>
 						{
@@ -633,7 +467,7 @@ namespace com.clusterrr.TuyaNet
 						};
 			string requestJson = JsonConvert.SerializeObject(cmd);
 			requestJson = FillJson(requestJson);
-			var response = await SendAsync(TuyaCommand.CONTROL, requestJson, retries, nullRetries, overrideRecvTimeout, cancellationToken);
+			var response = await SendAsync(TuyaCommand.CONTROL, requestJson, nullRetries, overrideRecvTimeout, cancellationToken);
 			if (string.IsNullOrEmpty(response.Json))
 			{
 				if (!allowEmptyResponse)
@@ -650,12 +484,11 @@ namespace com.clusterrr.TuyaNet
 		/// Update DP values.
 		/// </summary>
 		/// <param name="dpIds">DP identificators to update (can be empty for some devices).</param>
-		/// <param name="retries">Number of retries in case of network error (default - 2).</param>
 		/// <param name="nullRetries">Number of retries in case of empty answer (default - 1).</param>
 		/// <param name="overrideRecvTimeout">Override receive timeout (default - ReceiveTimeout property).</param>
 		/// <param name="cancellationToken">Cancellation token.</param>
 		/// <returns>Dictionary of DP numbers and values.</returns>
-		public async Task<Dictionary<int, object>> UpdateDpsAsync(IEnumerable<int> dpIds, int retries = 5, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
+		public async Task<Dictionary<int, object>> UpdateDpsAsync(IEnumerable<int> dpIds, int nullRetries = 1, int? overrideRecvTimeout = null, CancellationToken cancellationToken = default)
 		{
 			var cmd = new Dictionary<string, object>
 						{
@@ -663,7 +496,7 @@ namespace com.clusterrr.TuyaNet
 						};
 			string requestJson = JsonConvert.SerializeObject(cmd);
 			requestJson = FillJson(requestJson);
-			var response = await SendAsync(TuyaCommand.UPDATE_DPS, requestJson, retries, nullRetries, overrideRecvTimeout, cancellationToken);
+			var response = await SendAsync(TuyaCommand.UPDATE_DPS, requestJson,  nullRetries, overrideRecvTimeout, cancellationToken);
 			if (string.IsNullOrEmpty(response.Json))
 				return new Dictionary<int, object>();
 			var root = JObject.Parse(response.Json);

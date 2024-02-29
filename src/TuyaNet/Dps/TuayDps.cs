@@ -38,6 +38,24 @@ namespace com.clusterrr.TuyaNet.Dps
 			catch
 			{ return null; }
 		}
+		public double? TryGetDouble(string [] ids)
+		{
+			try
+			{
+				if (ids==null) return null;
+				foreach (var id in ids)
+				{
+					if (dps.TryGetValue(id, out var value))
+					{
+						return Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+					}
+				}
+				return null;
+			}
+			catch
+			{ return null; }
+		}
+
 	}
 
 
