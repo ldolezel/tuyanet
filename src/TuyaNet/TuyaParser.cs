@@ -334,8 +334,8 @@ namespace com.clusterrr.TuyaNet
 
             return new TuyaLocalResponse(byteResponse.Command, byteResponse.ReturnCode, decodedBytes, json);
         }
-        
-        internal TuyaLocalResponse DecodeResponse(byte[] data)
+
+				internal TuyaLocalResponse DecodeResponse(byte[] data)
         {
             if (version == TuyaProtocolVersion.V34)
                 return DecodeResponse34(data);
