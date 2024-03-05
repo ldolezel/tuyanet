@@ -24,14 +24,21 @@
         /// Response as JSON string.
         /// </summary>
         public string Json { get; }
+		
+				/// <summary>
+				/// Original whole packet
+				/// </summary>
+				public byte[] OriginalPacket { get; }
+		
 
-        internal TuyaLocalResponse(TuyaCommand command, int returnCode, byte[] payload, string json = null)
+				internal TuyaLocalResponse(TuyaCommand command, int returnCode, byte[] payload, string json, byte[] originalPacket)
         {
             Command = command;
             ReturnCode = returnCode;
             Payload = payload;
             Json = json;
-        }
+						OriginalPacket = originalPacket;
+				}
 
         public override string ToString() => $"{Command}: {Json} (return code = {ReturnCode})";
     }

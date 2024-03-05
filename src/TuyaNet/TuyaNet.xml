@@ -112,10 +112,11 @@
             Connection with Tuya device.
             </summary>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.#ctor(System.String,System.String,System.String,com.clusterrr.TuyaNet.Log.ILog,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.#ctor(System.String,System.String,System.String,System.String,com.clusterrr.TuyaNet.Log.ILog,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
             <summary>
             Creates a new instance of the TuyaDevice class.
             </summary>
+            <param name="name">optional name</param>
             <param name="ip">IP address of device.</param>
             <param name="localKey">Local key of device (obtained via API).</param>
             <param name="deviceId">Device ID.</param>
@@ -123,10 +124,11 @@
             <param name="port">TCP port of device.</param>
             <param name="receiveTimeout">Receive timeout (msec).</param>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.#ctor(System.String,com.clusterrr.TuyaNet.TuyaApi.Region,System.String,System.String,System.String,com.clusterrr.TuyaNet.Log.ILog,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.#ctor(System.String,System.String,com.clusterrr.TuyaNet.TuyaApi.Region,System.String,System.String,System.String,com.clusterrr.TuyaNet.Log.ILog,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
             <summary>
             Creates a new instance of the TuyaDevice class.
             </summary>
+            <param name="name">optional name</param>
             <param name="ip">IP address of device.</param>
             <param name="region">Region to access Cloud API.</param>
             <param name="accessId">Access ID to access Cloud API.</param>
@@ -206,6 +208,13 @@
             <returns>Raw data.</returns>
         </member>
         <member name="M:com.clusterrr.TuyaNet.TuyaDevice.DecodeResponse(System.Byte[])">
+            <summary>
+            Parses and decrypts payload data from received bytes.
+            </summary>
+            <param name="data">Raw data to parse and decrypt.</param>
+            <returns>Instance of TuyaLocalResponse.</returns>
+        </member>
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.DecodeResponses(System.Collections.Generic.IEnumerable{System.Byte[]})">
             <summary>
             Parses and decrypts payload data from received bytes.
             </summary>
@@ -320,10 +329,11 @@
             Tuya virtual IR remote control
             </summary>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaIRControl.#ctor(System.String,System.String,System.String,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaIRControl.#ctor(System.String,System.String,System.String,System.String,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
             <summary>
             Creates a new instance of the TuyaDevice class.
             </summary>
+            <param name="name">optional name</param>
             <param name="ip">IP address of device.</param>
             <param name="localKey">Local key of device (obtained via API).</param>
             <param name="deviceId">Device ID.</param>
@@ -331,10 +341,11 @@
             <param name="port">TCP port of device.</param>
             <param name="receiveTimeout">Receive timeout (msec).</param>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaIRControl.#ctor(System.String,com.clusterrr.TuyaNet.TuyaApi.Region,System.String,System.String,System.String,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaIRControl.#ctor(System.String,System.String,com.clusterrr.TuyaNet.TuyaApi.Region,System.String,System.String,System.String,com.clusterrr.TuyaNet.TuyaProtocolVersion,System.Int32,System.Int32)">
             <summary>
             Creates a new instance of the TuyaDevice class.
             </summary>
+            <param name="name">optional name</param>
             <param name="ip">IP address of device.</param>
             <param name="region">Region to access Cloud API.</param>
             <param name="accessId">Access ID to access Cloud API.</param>
@@ -412,10 +423,24 @@
             Response as JSON string.
             </summary>
         </member>
+        <member name="P:com.clusterrr.TuyaNet.TuyaLocalResponse.OriginalPacket">
+            <summary>
+            Original whole packet
+            </summary>
+        </member>
         <member name="T:com.clusterrr.TuyaNet.TuyaParser">
             <summary>
             Class to encode and decode data sent over local network.
             </summary>
+        </member>
+        <member name="M:com.clusterrr.TuyaNet.TuyaParser.DecodeResponses(System.Byte[],System.Int32)">
+            <summary>
+            Decode one or more Tuya responses
+            </summary>
+            <param name="data">data</param>
+            <param name="index">start index in array</param>
+            <returns></returns>
+            <exception cref="T:System.IO.InvalidDataException"></exception>
         </member>
         <member name="T:com.clusterrr.TuyaNet.TuyaProtocolVersion">
             <summary>

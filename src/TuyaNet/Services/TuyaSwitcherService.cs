@@ -33,7 +33,7 @@ namespace com.clusterrr.TuyaNet.Services
 			if (deviceVersion is null)
 				throw new NotSupportedException($"Not supported version {tuyaDeviceInfo.ApiVer}");
 
-			var dev = new TuyaDevice(
+			var dev = new TuyaDevice(name: tuyaDeviceInfo.Name,
 					ip: tuyaDeviceInfo.LocalIp,
 					localKey: tuyaDeviceInfo.LocalKey,
 					deviceId: tuyaDeviceInfo.DeviceId,
@@ -109,7 +109,8 @@ namespace com.clusterrr.TuyaNet.Services
 			var command = TuyaCommand.DP_QUERY;
 			_log?.Debug(8, "TUYA", $"Sending JSON {requestQuery}");
 			var request = dev.EncodeRequest(command, requestQuery);
-			var encryptedResponse = await dev.SendAsync(command, request);
+			var encryptedResponses = await dev.SendAsync(command, request);
+			var encryptedResponse = encryptedResponses?.FirstOrDefault();
 			var response = dev.DecodeResponse(encryptedResponse);
 			_log?.Debug(8, "TUYA", $"Received JSON {response?.Json}");
 			return response;
@@ -154,7 +155,9 @@ namespace com.clusterrr.TuyaNet.Services
 
 			_log?.Debug(8, "TUYA", $"Sending JSON {requestQuery}");
 			var request = dev.EncodeRequest(command, requestQuery);
-			var encryptedResponse = await dev.SendAsync(command, request);
+			var encryptedResponses = await dev.SendAsync(command, request);
+			var encryptedResponse = encryptedResponses.FirstOrDefault();
+
 			var response = dev.DecodeResponse(encryptedResponse);
 			_log?.Debug(8, "TUYA", $"Received JSON {response?.Json}");
 			return response;

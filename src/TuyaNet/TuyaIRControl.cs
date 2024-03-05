@@ -36,30 +36,32 @@ namespace com.clusterrr.TuyaNet
         /// <summary>
         /// Creates a new instance of the TuyaDevice class.
         /// </summary>
+				/// <param name="name">optional name</param>
         /// <param name="ip">IP address of device.</param>
         /// <param name="localKey">Local key of device (obtained via API).</param>
         /// <param name="deviceId">Device ID.</param>
         /// <param name="protocolVersion">Protocol version.</param>
         /// <param name="port">TCP port of device.</param>
         /// <param name="receiveTimeout">Receive timeout (msec).</param>
-        public TuyaIRControl(string ip, string localKey, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
-            : base(ip, localKey, deviceId,null, protocolVersion, port, receiveTimeout)
+        public TuyaIRControl(string name,string ip, string localKey, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
+            : base(name, ip, localKey, deviceId,null, protocolVersion, port, receiveTimeout)
         {
         }
 
-        /// <summary>
-        /// Creates a new instance of the TuyaDevice class.
-        /// </summary>
-        /// <param name="ip">IP address of device.</param>
-        /// <param name="region">Region to access Cloud API.</param>
-        /// <param name="accessId">Access ID to access Cloud API.</param>
-        /// <param name="apiSecret">API secret to access Cloud API.</param>
-        /// <param name="deviceId">Device ID.</param>
-        /// <param name="protocolVersion">Protocol version.</param>
-        /// <param name="port">TCP port of device.</param>
-        /// <param name="receiveTimeout">Receive timeout (msec).</param> 
-        public TuyaIRControl(string ip, TuyaApi.Region region, string accessId, string apiSecret, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
-            : base(ip, region, accessId, apiSecret, deviceId,null, protocolVersion, port, receiveTimeout)
+		/// <summary>
+		/// Creates a new instance of the TuyaDevice class.
+		/// </summary>
+		/// <param name="name">optional name</param>
+		/// <param name="ip">IP address of device.</param>
+		/// <param name="region">Region to access Cloud API.</param>
+		/// <param name="accessId">Access ID to access Cloud API.</param>
+		/// <param name="apiSecret">API secret to access Cloud API.</param>
+		/// <param name="deviceId">Device ID.</param>
+		/// <param name="protocolVersion">Protocol version.</param>
+		/// <param name="port">TCP port of device.</param>
+		/// <param name="receiveTimeout">Receive timeout (msec).</param> 
+		public TuyaIRControl(string name, string ip, TuyaApi.Region region, string accessId, string apiSecret, string deviceId, TuyaProtocolVersion protocolVersion = TuyaProtocolVersion.V33, int port = 6668, int receiveTimeout = 250)
+            : base(name, ip, region, accessId, apiSecret, deviceId,null, protocolVersion, port, receiveTimeout)
         {
         }
 
