@@ -31,7 +31,7 @@
 				public byte[] OriginalPacket { get; }
 		
 
-				internal TuyaLocalResponse(TuyaCommand command, int returnCode, byte[] payload, string json, byte[] originalPacket)
+				public TuyaLocalResponse(TuyaCommand command, int returnCode, byte[] payload, string json, byte[] originalPacket)
         {
             Command = command;
             ReturnCode = returnCode;

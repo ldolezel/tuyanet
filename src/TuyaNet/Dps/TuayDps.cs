@@ -25,6 +25,19 @@ namespace com.clusterrr.TuyaNet.Dps
 			catch
 			{ return null; }
 		}
+		public void TrySetBool(string id, bool value)
+		{
+			try
+			{
+				if (dps.TryGetValue(id, out _))
+				{
+					dps[id] = value;
+				}
+			}
+			catch
+			{ }
+		}
+
 		public double? TryGetDouble(string id)
 		{
 			try
