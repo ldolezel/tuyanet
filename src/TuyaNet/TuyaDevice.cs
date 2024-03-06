@@ -105,7 +105,7 @@ namespace com.clusterrr.TuyaNet
 		/// <summary>
 		/// Connection timeout.
 		/// </summary>
-		public int ConnectionTimeout { get; set; } = 500;
+		public int ConnectionTimeout { get; set; } = 1000;
 		/// <summary>
 		/// Receive timeout.
 		/// </summary>
