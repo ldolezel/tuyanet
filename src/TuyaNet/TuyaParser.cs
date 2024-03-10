@@ -68,7 +68,7 @@ namespace com.clusterrr.TuyaNet
 			return dest;
 		}
 
-		internal byte[] Decrypt(byte[] data, byte[] key)
+		public static byte[] Decrypt(byte[] data, byte[] key)
 		{
 			if (data is null || data.Length == 0) return data;
 
@@ -402,10 +402,10 @@ namespace com.clusterrr.TuyaNet
 			// Return code
 			int returnCode = BitConverter.ToInt32(BigEndian(onepacket.Skip(ALLHEADLEN).Take(INTLEN)).ToArray(), 0);
 			
-			
 			// Data
 			var extractdata = onepacket.Skip(ALLHEADLEN+ INTLEN).Take(length - INTLEN - INTLEN- SUFFIX.Length).ToArray();
 
+		
 			// Remove version 3.1 header
 			if (extractdata.Take(PROTOCOL_VERSION_BYTES_31.Length).SequenceEqual(PROTOCOL_VERSION_BYTES_31))
 			{
@@ -421,7 +421,16 @@ namespace com.clusterrr.TuyaNet
 
 			if (this.version == TuyaProtocolVersion.V33)
 			{
-				extractdata = Decrypt(extractdata, GetKey());
+				try
+				{
+					extractdata = Decrypt(extractdata, GetKey());
+				}
+				catch (Exception ex) 
+				{
+					//dont know the error structure, looks like invalid key, text can be "data format error"
+					if (returnCode==1) throw new InvalidDataException($"data format error (invalid key?)");
+					else throw new InvalidDataException($"error #{returnCode}", ex);
+				}
 			}
 
 			if (extractdata.Length == 0)
@@ -433,7 +442,12 @@ namespace com.clusterrr.TuyaNet
 				var json = Encoding.UTF8.GetString(extractdata);
 				if (!json.StartsWith("{") || !json.EndsWith("}"))
 				{
-					throw new InvalidDataException($"Response is not JSON: {json}");
+					if (returnCode != 0) //probably error message
+					{
+						yield return new TuyaLocalResponse(command, returnCode, extractdata, json, onepacket);
+						yield break;
+					}
+					else throw new InvalidDataException($"Response is not JSON: {json}");
 				}
 
 				yield return new TuyaLocalResponse(command, returnCode, extractdata, json, onepacket);
