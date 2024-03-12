@@ -155,7 +155,7 @@ namespace com.clusterrr.TuyaNet
 				root.AddFirst(new JProperty("devId", DeviceId));
 			if (addGwId && !root.ContainsKey("gwId"))
 				root.AddFirst(new JProperty("gwId", DeviceId));
-			return root.ToString();
+			return root.ToString( Formatting.None);
 		}
 
 		/// <summary>
