@@ -44,7 +44,10 @@ namespace com.clusterrr.TuyaNet.Dps
 			{
 				if (dps.TryGetValue(id, out var value))
 				{
-					return Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+					if (double.TryParse(value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var res))
+					{
+						return res;
+					}
 				}
 				return null;
 			}
@@ -60,7 +63,11 @@ namespace com.clusterrr.TuyaNet.Dps
 				{
 					if (dps.TryGetValue(id, out var value))
 					{
-						return Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+						if (double.TryParse (value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture,out var res))
+						{
+							return res;
+						}
+						
 					}
 				}
 				return null;
