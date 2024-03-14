@@ -35,9 +35,10 @@ namespace com.clusterrr.TuyaNet.Services
 
 			var dev = new TuyaDevice(name: tuyaDeviceInfo.Name,
 					ip: tuyaDeviceInfo.LocalIp,
+					port: tuyaDeviceInfo.Port <=0 ? 6668: tuyaDeviceInfo.Port,
 					localKey: tuyaDeviceInfo.LocalKey,
 					deviceId: tuyaDeviceInfo.DeviceId,
-					protocolVersion: deviceVersion.Value, 
+					protocolVersion: deviceVersion.Value,
 					log: log);
 					
 			dev.PermanentConnection = permanentConnection;

@@ -49,7 +49,7 @@ namespace com.clusterrr.TuyaNet
 			this.apiSecret = null;
 			DeviceId = deviceId;
 			ProtocolVersion = protocolVersion;
-			Port = port;
+			Port = port<=0 ? 6668:port;
 			ReceiveTimeout = receiveTimeout;
 			parser = new TuyaParser(localKey, protocolVersion);
 		}
