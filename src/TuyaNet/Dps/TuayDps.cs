@@ -42,6 +42,7 @@ namespace com.clusterrr.TuyaNet.Dps
 		{
 			try
 			{
+				if (string.IsNullOrWhiteSpace(id)) return null;
 				if (dps.TryGetValue(id, out var value))
 				{
 					if (double.TryParse(value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var res))
@@ -61,6 +62,7 @@ namespace com.clusterrr.TuyaNet.Dps
 				if (ids==null) return null;
 				foreach (var id in ids)
 				{
+					if (string.IsNullOrWhiteSpace(id)) continue;
 					if (dps.TryGetValue(id, out var value))
 					{
 						if (double.TryParse (value?.ToString(), System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture,out var res))
