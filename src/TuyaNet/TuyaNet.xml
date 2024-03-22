@@ -221,7 +221,7 @@
             <param name="data">Raw data to parse and decrypt.</param>
             <returns>Instance of TuyaLocalResponse.</returns>
         </member>
-        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SendAsync(com.clusterrr.TuyaNet.TuyaCommand,System.String,System.Int32,System.Nullable{System.Int32},System.Threading.CancellationToken)">
+        <member name="M:com.clusterrr.TuyaNet.TuyaDevice.SendAsync(com.clusterrr.TuyaNet.TuyaCommand,System.String,System.Int32,System.Nullable{System.Int32},System.Boolean,System.Threading.CancellationToken)">
             <summary>
             Sends JSON string to device and reads response.
             </summary>

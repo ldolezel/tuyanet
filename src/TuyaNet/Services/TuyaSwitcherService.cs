@@ -12,7 +12,7 @@ using Newtonsoft.Json;
 
 namespace com.clusterrr.TuyaNet.Services
 {
-	public class TuyaSwitcherService
+    public class TuyaSwitcherService
 	{
 		private readonly TuyaDevice device;
 		ILog _log = null;
