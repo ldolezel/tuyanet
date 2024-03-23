@@ -22,6 +22,20 @@ namespace com.clusterrr.TuyaNet
 	/// </summary>
 	public partial class TuyaDevice : IDisposable
 	{
+		public class ReceiveMsg:EventArgs
+		{
+			public ReceiveMsg (TuyaDevice device, TuyaLocalResponse message)
+			{
+				Device = device;
+				Message = message;
+			}
+
+			public TuyaDevice Device { get; }
+			public TuyaLocalResponse Message { get; }
+		}
+
+		public event EventHandler<ReceiveMsg> AsyncMessageReceived = null;
+
 		private readonly TuyaParser parser;
 		ILog _log;
 		string _name;
@@ -206,7 +220,7 @@ namespace com.clusterrr.TuyaNet
 		{
 			if (IsServiceLoopStarted)
 			{
-				var r = await DoQueued<IEnumerable<byte[]>>(() => SendAndReadAsync(command, EncodeRequest(command, json), nullRetries, overrideRecvTimeout, waitForAnswer, cancellationToken));
+				var r = await DoQueued<IEnumerable<byte[]>>(() => SendAndReadAsync(command, EncodeRequest(command, json), nullRetries, overrideRecvTimeout, waitForAnswer, true,cancellationToken));
 				return DecodeResponses(r);
 			}
 			else
@@ -335,7 +349,7 @@ namespace com.clusterrr.TuyaNet
 		{
 			if (IsServiceLoopStarted)
 			{
-				return await DoQueued<IEnumerable<byte[]>>(() => SendAndReadAsync(command, data, nullRetries, overrideRecvTimeout, waitForAnswer, cancellationToken));
+				return await DoQueued<IEnumerable<byte[]>>(() => SendAndReadAsync(command, data, nullRetries, overrideRecvTimeout, waitForAnswer,true, cancellationToken));
 			}else
 			{
 				return await Task.Run(() => SendAndRead(command, data, nullRetries, overrideRecvTimeout, cancellationToken));
@@ -426,12 +440,12 @@ namespace com.clusterrr.TuyaNet
 		}
 
 		async Task<IEnumerable<byte[]>> SendAndReadAsync(TuyaCommand command, byte[] data, int nullRetries = 1, int? overrideRecvTimeout = null,
-				bool waitForAnswer = true,CancellationToken cancellationToken = default)
+				bool waitForAnswer = true,bool canReconnect = true, CancellationToken cancellationToken = default)
 		{
 			if (!IsConnected() && PermanentConnection)
 			{
 				CloseSocket();
-				await SecureConnectAsyncInternal(cancellationToken);
+				if (canReconnect) await SecureConnectAsyncInternal(cancellationToken);
 			}
 
 			if (!IsConnected()) throw new Exception("Not connected");
@@ -454,15 +468,12 @@ namespace com.clusterrr.TuyaNet
 					while (waitForAnswer && result.Count <= 0)
 					{
 						var responseRaw = await ReceiveAsync(client, nullRetries, overrideRecvTimeout, cancellationToken);
-						/*System.IO.File.WriteAllBytes(@"C:\tmp\tuyalog\responseRaw" + _name + ct.ToString() + ".bin", responseRaw);
-						ct++;*/
-
+						if (responseRaw == null) return null;
 
 						var responsesParsed = parser.DecodeResponses(responseRaw).ToArray();
 						foreach (var item in responsesParsed)
 						{
-							_log?.Debug(8, _name, $"Received json: {item.Json}");
-							_log?.Debug(8, _name, $"Received command: {item.Command.GetNames()}");
+							_log?.Debug(8, _name, $"Received command {item.Command.GetNames()}, JSON {item?.Json}");
 
 							//remove empty
 							if (item.Payload != null && item.Payload.Length > 0)
@@ -566,8 +577,21 @@ namespace com.clusterrr.TuyaNet
 				Stopwatch sw = Stopwatch.StartNew();
 				while (!isEnding)
 				{
+					int bytes;
+					if (timeout == 0) //anly read what is available
+					{
+						if (client.Client.Available > 0)
+						{
+							bytes = await client.Client.ReceiveAsync(new Memory<byte>(buffer, 0, length), SocketFlags.None);
+						}
+						else
+						{
+							return null;
+						}
+					}
+
 					var timeoutCancellationTokenSource = new CancellationTokenSource();
-					var bytes = await client.Client.ReceiveAsync(new Memory<byte>(buffer, 0, length), SocketFlags.None);
+					bytes = await client.Client.ReceiveAsync(new Memory<byte>(buffer, 0, length), SocketFlags.None);
 					if (bytes > 0)
 					{
 						await ms.WriteAsync(buffer, 0, bytes);
@@ -579,11 +603,7 @@ namespace com.clusterrr.TuyaNet
 						var packetEnding = receivedArray.Skip(receivedArray.Length - 4).Take(4).ToArray();
 						isEnding = TuyaParser.SUFFIX.SequenceEqual(packetEnding);
 					}
-					/*	else
-						{
-							isEnding = true;
-						}*/
-					if (sw.ElapsedMilliseconds > timeout)
+					if (timeout!=0 && sw.ElapsedMilliseconds > timeout)
 					{
 						throw new TimeoutException();
 					}
@@ -709,6 +729,15 @@ namespace com.clusterrr.TuyaNet
 		public void Dispose()
 		{
 			CloseSocket();
+		}
+
+		protected void OnAsyncMessageReceived (TuyaLocalResponse message)
+		{
+			try
+			{//{"devId":"86383601a4cf12e6e3b0","dps":{"102":41},"t":1711229572}
+				AsyncMessageReceived?.Invoke(this, new ReceiveMsg(this, message));
+			}
+			catch { }
 		}
 	}
 }

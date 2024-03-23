@@ -25,6 +25,11 @@ namespace com.clusterrr.TuyaNet
 		private byte[] localKey;
 		private TuyaProtocolVersion version;
 
+
+
+
+
+
 		public TuyaParser(string localKey, TuyaProtocolVersion tuyaProtocolVersion)
 				: this(localKey == null ? null : Encoding.UTF8.GetBytes(localKey), tuyaProtocolVersion)
 		{
@@ -360,10 +365,21 @@ namespace com.clusterrr.TuyaNet
 		/// <exception cref="InvalidDataException"></exception>
 		public IEnumerable<TuyaLocalResponse> DecodeResponses(byte[] data, int index=0)
 		{
+			/*Header
+			 * int Prefix 
+         int seqno,
+         int cmd,
+         int payloadlen
+			*/
+
+			const int SEQINDEX = 4;
 			const int CMDINDEX = 8;
 			const int HEADLEN = 12;
 			const int INTLEN = 4;
 			const int ALLHEADLEN = HEADLEN+ INTLEN;
+
+
+			//L.D. terrible code parsing header, but it was already written and I don't want to rewrite it
 
 			if (data==null) yield break;
 			var arrlen = data.Length - index;
@@ -378,6 +394,13 @@ namespace com.clusterrr.TuyaNet
 			{
 				throw new InvalidDataException("Invalid header/prefix");
 			}
+			
+		
+
+			int seqNo = BitConverter.ToInt32(BigEndian(data.Skip(index + SEQINDEX).Take(INTLEN)).ToArray(), 0);
+
+			
+
 			// Check length
 			int length = BitConverter.ToInt32(BigEndian(data.Skip(index+ HEADLEN).Take(INTLEN)).ToArray(), 0);
 			if (arrlen < ALLHEADLEN + length)

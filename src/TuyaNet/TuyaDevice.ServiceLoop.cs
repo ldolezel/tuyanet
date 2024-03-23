@@ -1,4 +1,5 @@
-﻿using System;
+﻿using com.clusterrr.TuyaNet.Extensions;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,7 +12,7 @@ namespace com.clusterrr.TuyaNet
 {
 	public partial class TuyaDevice
 	{
-		const int HEART_BEAT_INTERVAL = 15000;
+		const int HEART_BEAT_INTERVAL = 30000;
 		ConcurrentQueue<Func<Task>> _serviceQueue = new ConcurrentQueue<Func<Task>>();
 		bool _ServiceLoopStop = false;
 		bool _ServiceLoopStarted = false;
@@ -52,11 +53,23 @@ namespace com.clusterrr.TuyaNet
 					}
 					else
 					{
-						await Task.Delay(20, canceltoken);
+						await Task.Delay(50, canceltoken);
+						if (permanentConn )
+						{
+							var existing = await ReadExisting(this, canceltoken);
+							if (existing!=null && existing.ReturnCode==0)
+							{
+								//process message - maybe STATUS
+								OnAsyncMessageReceived (existing);
+							}
+						}
 					}
+
+
+
 					if (permanentConn && sw.ElapsedMilliseconds>= HEART_BEAT_INTERVAL)
 					{
-						await SendHeartBeat(this, canceltoken);
+					//	await SendHeartBeat(this, canceltoken);
 						sw.Restart();
 					}
 				}
@@ -80,13 +93,33 @@ namespace com.clusterrr.TuyaNet
 				var command = TuyaCommand.HEART_BEAT;
 				_log?.Debug(8, "TUYA", $"Sending Heartbeat JSON {requestQuery}");
 				var request = dev.EncodeRequest(command, requestQuery);
-				var encryptedResponses = await dev.SendAndReadAsync(command, request, 0, 1000, true, canceltoken);
+				var encryptedResponses = await dev.SendAndReadAsync(command, request, 0, 500,true,true, canceltoken);
 				var encryptedResponse = encryptedResponses?.FirstOrDefault();
 				var response = dev.DecodeResponse(encryptedResponse);
-				_log?.Debug(8, "TUYA", $"Received JSON {response?.Json}");
+				_log?.Debug(8, _name, $"Received command {response.Command.GetNames()}, JSON {response?.Json}");
 				return response;
 			}
 			catch  (Exception ex) 
+			{
+				return await Task.FromResult(new TuyaLocalResponse(TuyaCommand.HEART_BEAT, 1, null, ex.Message, null));
+			}
+		}
+
+		async Task<TuyaLocalResponse> ReadExisting(TuyaDevice dev, CancellationToken canceltoken)
+		{
+			try
+			{
+				var encryptedResponses = await dev.SendAndReadAsync( TuyaCommand.HEART_BEAT /*no matter*/,null, 0, 0,true,false, canceltoken);
+				if (encryptedResponses != null)
+				{
+					var encryptedResponse = encryptedResponses?.FirstOrDefault();
+					var response = dev.DecodeResponse(encryptedResponse);
+					_log?.Debug(8, _name, $"Received command {response.Command.GetNames()}, JSON {response?.Json}");
+					return response;
+				}
+				return null;
+			}
+			catch (Exception ex)
 			{
 				return await Task.FromResult(new TuyaLocalResponse(TuyaCommand.HEART_BEAT, 1, null, ex.Message, null));
 			}

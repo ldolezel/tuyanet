@@ -12,15 +12,53 @@ using Newtonsoft.Json;
 
 namespace com.clusterrr.TuyaNet.Services
 {
-    public class TuyaSwitcherService
+	public class TuyaSwitcherService
 	{
-		private readonly TuyaDevice device;
+		TuyaDevice _device;
 		ILog _log = null;
+		TuyaDeviceInfo _deviceInfo;
+		bool _permanentConnection;
 
-		public TuyaSwitcherService(TuyaDeviceInfo deviceInfo, bool permanentConnection=false, ILog log = null)
+		public TuyaSwitcherService(TuyaDeviceInfo deviceInfo, bool permanentConnection = false, ILog log = null)
 		{
-			_log=log;
-			this.device = GetDevice(deviceInfo, permanentConnection, log);
+			_log = log;
+			_deviceInfo = deviceInfo;
+			_permanentConnection = permanentConnection;
+		}
+
+		TuyaDevice Device
+		{
+			get
+			{ 
+				if (_device==null)
+				{
+					_device = GetDevice(_deviceInfo, _permanentConnection, _log);
+					_device.AsyncMessageReceived += _device_AsyncMessageReceived;
+				}
+				return _device;
+			}
+			set
+			{ 
+				if (_device != null)
+				{
+					_device.AsyncMessageReceived -= _device_AsyncMessageReceived;
+				}
+				_device = value;
+				if (value!=null)
+				{
+					value.AsyncMessageReceived += _device_AsyncMessageReceived;
+				}
+				
+			}
+		}
+
+		private void _device_AsyncMessageReceived(object sender, TuyaDevice.ReceiveMsg e)
+		{
+			if (e.Message.Command == TuyaCommand.STATUS)
+			{
+				var dps = JsonConvert.DeserializeObject<TuayDps>(e.Message.Json);
+
+			}
 		}
 
 		public static TuyaDevice GetDevice(TuyaDeviceInfo tuyaDeviceInfo, bool permanentConnection, ILog log = null)
@@ -60,44 +98,46 @@ namespace com.clusterrr.TuyaNet.Services
 
 		public async Task<TuyaLocalResponse> GetFullStatus(string switchNo = "1")
 		{
-			var statusResp = await GetStatus(device);
-			_log?.Debug(8, device?.DeviceId, $"GetFullStatus of {switchNo}. Response JSON: {statusResp?.Json}");
+			var statusResp = await GetStatus(Device);
+			_log?.Debug(8, Device?.DeviceId, $"GetFullStatus of {switchNo}. Response JSON: {statusResp?.Json}");
 			return statusResp;
 		}
 		public async Task TurnOn(string switchNo = "1")
 		{
-			var response = await SetStatus(device, true, switchNo);
-			_log?.Debug(8, device?.DeviceId, $"Turn on {switchNo}. Response JSON: {response?.Json}");
+			var response = await SetStatus(Device, true, switchNo);
+			_log?.Debug(8, Device?.DeviceId, $"Turn on {switchNo}. Response JSON: {response?.Json}");
 		}
 
 		public async Task Connect()
 		{
-			await device.SecureConnectAsync();
-			_log?.Debug(5, device?.DeviceId, $"Success connected.");
+			await Device.SecureConnectAsync();
+			_log?.Debug(5, Device?.DeviceId, $"Success connected.");
 		}
 		public bool IsConnected()
 		{
-			return device!=null && device.IsConnected();
+			return _device != null && _device.IsConnected();
 		}
 
 
 		public void Disconnect()
 		{
+			var tmp = _device;
+			Device = null;
 			try
 			{
-				device.Close();
-				_log?.Debug(5, device?.DeviceId, $"Success disconnected.");
+				tmp?.Close();
+				_log?.Debug(5, tmp?.DeviceId, $"Success disconnected.");
 			}
 			catch (Exception ex)
 			{
-				_log?.Debug(5, device?.DeviceId, $"Error disconnected: {ex.Message}");
+				_log?.Debug(5, tmp?.DeviceId, $"Error disconnected: {ex.Message}");
 			}
 		}
 
 		public async Task TurnOff(string switchNo = "1")
 		{
-			var response = await SetStatus(device, false, switchNo);
-			_log?.Debug(8, device?.DeviceId, $"Turn off {switchNo}. Response JSON: {response?.Json}");
+			var response = await SetStatus(Device, false, switchNo);
+			_log?.Debug(8, Device?.DeviceId, $"Turn off {switchNo}. Response JSON: {response?.Json}");
 		}
 
 		private async Task<TuyaLocalResponse> GetStatus(TuyaDevice dev)
@@ -119,8 +159,8 @@ namespace com.clusterrr.TuyaNet.Services
 
 		public async Task<TuyaLocalResponse> SetStatus(string switchNo, bool switchStatus)
 		{
-			var response = await SetStatus(device, switchStatus, switchNo);
-			_log?.Debug(8, device?.DeviceId, $"SetStatus {switchNo} to {switchStatus}. Response JSON: {response?.Json}");
+			var response = await SetStatus(Device, switchStatus, switchNo);
+			_log?.Debug(8, Device?.DeviceId, $"SetStatus {switchNo} to {switchStatus}. Response JSON: {response?.Json}");
 			return response;
 		}
 		async Task<TuyaLocalResponse> SetStatus(TuyaDevice dev, bool switchStatus, string switchNo)
