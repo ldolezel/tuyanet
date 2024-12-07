@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static com.clusterrr.TuyaNet.TuyaApi;
 
 namespace com.clusterrr.TuyaNet
 {
@@ -55,6 +56,20 @@ namespace com.clusterrr.TuyaNet
 			httpClient = new HttpClient();
 		}
 
+		public static TuyaApi.Region ParseRegion(string region, bool canthrow)
+		{
+			if (!string.IsNullOrWhiteSpace(region))
+			{
+				if (!Enum.TryParse<TuyaApi.Region>(region, true, out var lregion))
+				{
+					if (canthrow) throw new ArgumentException($"Unknown TUYA region '{region}', valid is 'China,WesternAmerica,EasternAmerica,CentralEurope,WesternEurope,India'");
+					return Region.CentralEurope;
+				}
+				return lregion;
+			}
+			return Region.CentralEurope; 
+		}
+
 		/// <summary>
 		/// Region of server.
 		/// </summary>
@@ -77,35 +92,55 @@ namespace com.clusterrr.TuyaNet
 			POST,
 			PUT,
 			DELETE
+	
 		}
 
-		private static string RegionToHost(Region region)
+
+		public static string RegionToHostDomain(string region)
+		{
+		return RegionToHostDomain (TuyaApi.ParseRegion(region,false));
+		}
+		public static string RegionToHostDomain(Region region)
 		{
 			string urlHost = null;
 			switch (region)
 			{
 				case Region.China:
-					urlHost = "openapi.tuyacn.com";
+					urlHost = "tuyacn.com";
 					break;
 				case Region.WesternAmerica:
-					urlHost = "openapi.tuyaus.com";
+					urlHost = "tuyaus.com";
 					break;
 				case Region.EasternAmerica:
-					urlHost = "openapi-ueaz.tuyaus.com";
+					urlHost = "tuyaus.com";
 					break;
 				case Region.CentralEurope:
-					urlHost = "openapi.tuyaeu.com";
+					urlHost = "tuyaeu.com";
 					break;
 				case Region.WesternEurope:
-					urlHost = "openapi-weaz.tuyaeu.com";
+					urlHost = "tuyaeu.com";
 					break;
 				case Region.India:
-					urlHost = "openapi.tuyain.com";
+					urlHost = "tuyain.com";
 					break;
 			}
 			return urlHost;
 		}
+		private static string RegionToHost(Region region)
+		{
 
+			string urlHost = RegionToHostDomain(region);
+			if (urlHost == null) return null;
+			switch (region)
+			{
+				case Region.EasternAmerica:
+					return "openapi-ueaz." + urlHost; ;
+				case Region.WesternEurope:
+					return "openapi-weaz." + urlHost;
+				default:
+					return "openapi." + urlHost;
+			}
+		}
 
 		/// <summary>
 		/// Request to official API.
